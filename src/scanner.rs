@@ -96,15 +96,15 @@ impl<'a> Scanner<'a> {
             match c {
                 ' ' | '\r' | '\t' => {
                     self.advance();
-                    break;
+                    // break;
                 }
                 '\n' => {
                     self.line += 1;
                     self.advance();
-                    break;
+                    // break;
                 }
                 '/' => {
-                    if &self.source[self.current - 1..=self.current] == "//" {
+                    if &self.source[self.current..=self.current + 1] == "//" {
                         while matches!(self.peek(), Some(c) if *c != '\n') {
                             self.advance();
                         }
