@@ -58,12 +58,29 @@ impl Vm {
                     // println!();
                     // break;
                 }
+                OpCode::Add => {
+                    let b = self.pop_stack().as_number().unwrap();
+                    let a = self.pop_stack().as_number().unwrap();
+                    self.push_stack((a + b).into());
+                }
+                OpCode::Subtract => {
+                    let b = self.pop_stack().as_number().unwrap();
+                    let a = self.pop_stack().as_number().unwrap();
+                    self.push_stack((a - b).into());
+                }
+                OpCode::Multiply => {
+                    let b = self.pop_stack().as_number().unwrap();
+                    let a = self.pop_stack().as_number().unwrap();
+                    self.push_stack((a * b).into());
+                }
+                OpCode::Divide => {
+                    let b = self.pop_stack().as_number().unwrap();
+                    let a = self.pop_stack().as_number().unwrap();
+                    self.push_stack((a / b).into());
+                }
                 OpCode::Negate => {
-                    let mut c = self.pop_stack();
-                    if !c.negate() {
-                        return InterpretResult::RuntimeError;
-                    }
-                    self.push_stack(c);
+                    let v = self.pop_stack().as_number().unwrap();
+                    self.push_stack((-v).into());
                 }
                 OpCode::Return => {
                     let value = self.pop_stack();

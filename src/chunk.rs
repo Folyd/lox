@@ -7,6 +7,10 @@ use crate::Value;
 pub enum OpCode {
     Constant,
     Return,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
     Negate,
     Unknown,
 }
@@ -68,6 +72,10 @@ impl Chunk {
             match OpCode::try_from(*code).unwrap_or(OpCode::Unknown) {
                 OpCode::Return => return simple_instruction("OP_RETURN", offset),
                 OpCode::Constant => return constant_instruction("OP_CONSTANT", self, offset),
+                OpCode::Add => return simple_instruction("OP_ADD", offset),
+                OpCode::Subtract => return simple_instruction("OP_SUBTRACT", offset),
+                OpCode::Multiply => return simple_instruction("OP_MULTIPLY", offset),
+                OpCode::Divide => return simple_instruction("OP_DIVIDE", offset),
                 OpCode::Negate => return simple_instruction("OP_NEGATE", offset),
                 OpCode::Unknown => {}
             }

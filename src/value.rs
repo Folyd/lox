@@ -16,12 +16,16 @@ impl Display for Value {
 }
 
 impl Value {
-    pub fn negate(&mut self) -> bool {
-        if let Value::Const(v) = self {
-            *v = -*v;
-            true
-        } else {
-            false
+    pub fn as_number(self) -> Result<f64, &'static str> {
+        match self {
+            Value::Const(value) => Ok(value),
+            Value::Nnon => Err("cannot convert to number"),
         }
+    }
+}
+
+impl From<f64> for Value {
+    fn from(value: f64) -> Self {
+        Value::Const(value)
     }
 }
