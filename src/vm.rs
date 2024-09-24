@@ -1,4 +1,4 @@
-use crate::{chunk::print_value, Chunk, OpCode, Value};
+use crate::{chunk::print_value, compiler::compile, Chunk, OpCode, Value};
 
 const STACK_MAX_SIZE: usize = 256;
 
@@ -35,9 +35,14 @@ impl Vm {
         }
     }
 
-    pub fn interpret(&mut self, chunk: Chunk) -> InterpretResult {
+    pub fn interpret_chunk(&mut self, chunk: Chunk) -> InterpretResult {
         self.chunk = Some(chunk);
         self.run()
+    }
+
+    pub fn interpret(&mut self, source: &str) -> InterpretResult {
+        compile(source);
+        InterpretResult::Ok
     }
 
     fn run(&mut self) -> InterpretResult {
