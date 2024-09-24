@@ -14,3 +14,14 @@ impl Display for Value {
         }
     }
 }
+
+impl Value {
+    pub fn negate(&mut self) -> bool {
+        if let Value::Const(v) = self {
+            *v = -*v;
+            true
+        } else {
+            false
+        }
+    }
+}

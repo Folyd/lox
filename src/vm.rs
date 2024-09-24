@@ -58,16 +58,23 @@ impl Vm {
                     // println!();
                     // break;
                 }
-                OpCode::Return => {
-                    if let Some(value) = self.pop_stack() {
-                        print_value(&value);
-                        println!();
+                OpCode::Negate => {
+                    let mut c = self.pop_stack();
+                    if !c.negate() {
+                        return InterpretResult::RuntimeError;
                     }
+                    self.push_stack(c);
+                }
+                OpCode::Return => {
+                    let value = self.pop_stack();
+                    print_value(&value);
+                    println!();
                     return InterpretResult::Ok;
                 }
                 OpCode::Unknown => return InterpretResult::RuntimeError,
             }
         }
+        // InterpretResult::Ok
     }
 }
 
@@ -81,12 +88,12 @@ impl Vm {
         }
     }
 
-    fn pop_stack(&mut self) -> Option<Value> {
+    fn pop_stack(&mut self) -> Value {
         if self.stack_top > 0 {
             self.stack_top -= 1;
-            Some(self.stack[self.stack_top])
+            self.stack[self.stack_top]
         } else {
-            None
+            panic!("Stack underflow")
         }
     }
 
