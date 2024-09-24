@@ -104,8 +104,8 @@ impl<'a> Scanner<'a> {
                     break;
                 }
                 '/' => {
-                    if self.source[self.current..].starts_with("//") {
-                        while self.peek().is_some() {
+                    if &self.source[self.current - 1..=self.current] == "//" {
+                        while matches!(self.peek(), Some(c) if *c != '\n') {
                             self.advance();
                         }
                     } else {
@@ -168,28 +168,32 @@ impl<'a> Scanner<'a> {
                 '/' => return self.make_token(TokenType::Slash),
                 '*' => return self.make_token(TokenType::Star),
                 '!' => {
-                    return if self.source[self.start..self.current].starts_with("!=") {
+                    return if self.source[self.current - 1..=self.current].starts_with("!=") {
+                        self.advance();
                         self.make_token(TokenType::BangEqual)
                     } else {
                         self.make_token(TokenType::Bang)
                     };
                 }
                 '=' => {
-                    return if self.source[self.start..self.current].starts_with("==") {
+                    return if self.source[self.current - 1..=self.current].starts_with("==") {
+                        self.advance();
                         self.make_token(TokenType::EqualEqual)
                     } else {
                         self.make_token(TokenType::Equal)
                     };
                 }
                 '<' => {
-                    return if self.source[self.start..self.current].starts_with("<=") {
+                    return if self.source[self.current - 1..=self.current].starts_with("<=") {
+                        self.advance();
                         self.make_token(TokenType::LessEqual)
                     } else {
                         self.make_token(TokenType::Less)
                     };
                 }
                 '>' => {
-                    return if self.source[self.start..self.current].starts_with(">=") {
+                    return if self.source[self.current - 1..=self.current].starts_with(">=") {
+                        self.advance();
                         self.make_token(TokenType::GreaterEqual)
                     } else {
                         self.make_token(TokenType::Greater)
