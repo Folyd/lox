@@ -11,11 +11,11 @@ pub enum OpCode {
 }
 
 pub struct Chunk {
-    code: Vec<u8>,
+    pub code: Vec<u8>,
     // count: usize,
     // capacity: usize,
-    constans: Vec<Value>,
-    lines: Vec<usize>,
+    pub constans: Vec<Value>,
+    pub lines: Vec<usize>,
 }
 
 impl Chunk {
@@ -43,6 +43,10 @@ impl Chunk {
         self.constans.len() - 1
     }
 
+    pub fn read_constant(&self, byte: u8) -> Value {
+        self.constans[byte as usize]
+    }
+
     pub fn disassemble(&self, name: &str) {
         println!("== {name} ==");
         let mut offset = 0usize;
@@ -51,7 +55,7 @@ impl Chunk {
         }
     }
 
-    fn disassemble_instruction(&self, offset: usize) -> usize {
+    pub fn disassemble_instruction(&self, offset: usize) -> usize {
         print!("{:04} ", offset);
         if offset > 0 && self.lines[offset] == self.lines[offset - 1] {
             print!("   | ");
@@ -86,6 +90,6 @@ fn constant_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
     offset + 2
 }
 
-fn print_value(value: &Value) {
+pub fn print_value(value: &Value) {
     print!("{}", value);
 }
