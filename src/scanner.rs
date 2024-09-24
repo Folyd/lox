@@ -146,6 +146,65 @@ impl<'a> Scanner<'a> {
         self.make_token(TokenType::Number)
     }
 
+    fn check_keyword(
+        &mut self,
+        start: usize,
+        length: usize,
+        rest: &str,
+        kind: TokenType,
+    ) -> Token<'_> {
+        if self.current - self.start == start + length
+            && &self.source[self.start + start..self.current] == rest
+        {
+            return self.make_token(kind);
+        }
+        self.make_token(TokenType::Identifier)
+    }
+
+    fn scan_identifier(&mut self) -> Token<'_> {
+        while matches!(self.peek(), Some(c) if c.is_alphanumeric()) {
+            self.advance();
+        }
+
+        let mut chars = self.source[self.start..self.current].chars();
+        if let Some(c) = chars.next() {
+            match c {
+                'a' => return self.check_keyword(1, 2, "nd", TokenType::And),
+                'c' => return self.check_keyword(1, 4, "lass", TokenType::Class),
+                'e' => return self.check_keyword(1, 3, "lse", TokenType::Else),
+                'f' => {
+                    if let Some(c) = chars.next() {
+                        match c {
+                            'a' => return self.check_keyword(2, 3, "lse", TokenType::False),
+                            'o' => return self.check_keyword(2, 1, "r", TokenType::For),
+                            'u' => return self.check_keyword(2, 1, "n", TokenType::Fun),
+                            _ => {}
+                        }
+                    }
+                }
+                'i' => return self.check_keyword(1, 1, "f", TokenType::If),
+                'n' => return self.check_keyword(1, 2, "il", TokenType::Nil),
+                'o' => return self.check_keyword(1, 1, "r", TokenType::Or),
+                'p' => return self.check_keyword(1, 4, "rint", TokenType::Print),
+                'r' => return self.check_keyword(1, 5, "eturn", TokenType::Return),
+                's' => return self.check_keyword(1, 4, "uper", TokenType::Super),
+                't' => {
+                    if let Some(c) = chars.next() {
+                        match c {
+                            'h' => return self.check_keyword(2, 2, "is", TokenType::This),
+                            'r' => return self.check_keyword(2, 2, "ue", TokenType::True),
+                            _ => {}
+                        }
+                    }
+                }
+                'v' => return self.check_keyword(1, 2, "ar", TokenType::Var),
+                'w' => return self.check_keyword(1, 4, "hile", TokenType::While),
+                _ => {}
+            }
+        }
+        self.make_token(TokenType::Identifier)
+    }
+
     pub fn scan_token(&mut self) -> Token {
         self.skip_white_spaces();
 
@@ -153,6 +212,10 @@ impl<'a> Scanner<'a> {
         if let Some(c) = self.advance() {
             if c.is_digit(10) {
                 return self.scan_number();
+            }
+
+            if c.is_alphabetic() || c == '_' {
+                return self.scan_identifier();
             }
 
             match c {
