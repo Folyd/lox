@@ -1,4 +1,6 @@
-use crate::{chunk::print_value, Chunk, OpCode};
+use crate::{chunk::print_value, Chunk, OpCode, Value};
+
+const STACK_MAX_SIZE: usize = 256;
 
 pub enum InterpretResult {
     Ok,
@@ -8,11 +10,18 @@ pub enum InterpretResult {
 pub struct Vm {
     chunk: Option<Chunk>,
     ip: usize,
+    stack: [Value; STACK_MAX_SIZE],
+    stack_top: usize,
 }
 
 impl Vm {
     pub fn new() -> Vm {
-        Vm { chunk: None, ip: 0 }
+        Vm {
+            chunk: None,
+            ip: 0,
+            stack: [Value::Nnon; STACK_MAX_SIZE],
+            stack_top: 0,
+        }
     }
 
     fn read_byte(&mut self) -> u8 {
@@ -33,6 +42,8 @@ impl Vm {
 
     fn run(&mut self) -> InterpretResult {
         loop {
+            // Debug stack info
+            self.print_stack();
             // Disassemble instruction for debug
             self.chunk
                 .as_ref()
@@ -42,14 +53,50 @@ impl Vm {
                 OpCode::Constant => {
                     let byte = self.read_byte();
                     let constant = self.chunk.as_ref().unwrap().read_constant(byte);
-                    print_value(&constant);
-                    println!();
-                    break;
+                    self.push_stack(constant);
+                    // print_value(&constant);
+                    // println!();
+                    // break;
                 }
-                OpCode::Return => return InterpretResult::Ok,
+                OpCode::Return => {
+                    if let Some(value) = self.pop_stack() {
+                        print_value(&value);
+                        println!();
+                    }
+                    return InterpretResult::Ok;
+                }
                 OpCode::Unknown => return InterpretResult::RuntimeError,
             }
         }
-        InterpretResult::Ok
+    }
+}
+
+impl Vm {
+    fn push_stack(&mut self, value: Value) {
+        if self.stack_top < STACK_MAX_SIZE {
+            self.stack[self.stack_top] = value;
+            self.stack_top += 1;
+        } else {
+            panic!("Stack overflow");
+        }
+    }
+
+    fn pop_stack(&mut self) -> Option<Value> {
+        if self.stack_top > 0 {
+            self.stack_top -= 1;
+            Some(self.stack[self.stack_top])
+        } else {
+            None
+        }
+    }
+
+    fn print_stack(&self) {
+        print!("          ");
+        for value in self.stack.iter().take(self.stack_top) {
+            print!("[");
+            print_value(value);
+            print!("]")
+        }
+        println!();
     }
 }

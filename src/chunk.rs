@@ -60,7 +60,7 @@ impl Chunk {
         if offset > 0 && self.lines[offset] == self.lines[offset - 1] {
             print!("   | ");
         } else {
-            print!("{:04} ", self.lines[offset]);
+            print!("{} ", self.lines[offset]);
         }
 
         if let Some(code) = self.code.get(offset) {
