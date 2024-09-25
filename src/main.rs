@@ -12,11 +12,11 @@ pub use value::Value;
 use vm::Vm;
 
 fn main() {
-    let args = args();
+    let mut args = args();
     if args.len() == 1 {
         // repl
     } else if args.len() == 2 {
-        let path = args.skip(1).next().unwrap();
+        let path = args.nth(1).unwrap();
         run_file(&path);
     } else {
         println!("Usage: clox [path]");

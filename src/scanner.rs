@@ -1,6 +1,6 @@
 use std::{iter::Peekable, str::Chars};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     LeftParen,
     RightParen,
@@ -48,16 +48,30 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token<'a> {
     pub kind: TokenType,
     pub origin: &'a str,
     pub line: usize,
 }
 
+impl Default for Token<'_> {
+    fn default() -> Self {
+        Self {
+            kind: TokenType::Eof,
+            origin: "",
+            line: 1,
+        }
+    }
+}
+
 impl<'a> Token<'a> {
     fn new(kind: TokenType, origin: &'a str, line: usize) -> Self {
         Token { kind, origin, line }
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self.kind, TokenType::Error)
     }
 }
 
@@ -67,6 +81,7 @@ pub struct Scanner<'a> {
     pub start: usize,
     pub current: usize,
     pub line: usize,
+    is_eof: bool,
 }
 
 impl<'a> Scanner<'a> {
@@ -77,6 +92,7 @@ impl<'a> Scanner<'a> {
             start: 0,
             current: 0,
             line: 1,
+            is_eof: false,
         }
     }
 
@@ -116,7 +132,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn make_token(&self, kind: TokenType) -> Token {
+    fn make_token(&self, kind: TokenType) -> Token<'a> {
         Token {
             kind,
             origin: &self.source[self.start..self.current],
@@ -125,19 +141,19 @@ impl<'a> Scanner<'a> {
     }
 
     fn _advance_digit(&mut self) {
-        while matches!(self.peek(), Some(c) if c.is_digit(10)) {
+        while matches!(self.peek(), Some(c) if c.is_ascii_digit()) {
             self.advance();
         }
     }
 
-    fn scan_number(&mut self) -> Token {
+    fn scan_number(&mut self) -> Token<'a> {
         // TODO: fix this: 0p =>  19 Number 0
         //                         | Identifier p
         self._advance_digit();
         // Look for a fractional part.
         let mut next_two_chars = self.source[self.current..self.current + 2].chars();
         let (maybe_dot, maybe_digit) = (next_two_chars.next(), next_two_chars.next());
-        if maybe_dot == Some('.') && matches!(maybe_digit, Some(c) if c.is_digit(10)) {
+        if maybe_dot == Some('.') && matches!(maybe_digit, Some(c) if c.is_ascii_digit()) {
             // Consume the "."
             self.advance();
 
@@ -147,7 +163,7 @@ impl<'a> Scanner<'a> {
         self.make_token(TokenType::Number)
     }
 
-    fn scan_identifier(&mut self) -> Token<'_> {
+    fn scan_identifier(&mut self) -> Token<'a> {
         while matches!(self.peek(), Some(c) if c.is_alphanumeric() || *c == '_') {
             self.advance();
         }
@@ -175,12 +191,12 @@ impl<'a> Scanner<'a> {
         self.make_token(kind)
     }
 
-    pub fn scan_token(&mut self) -> Token {
+    pub fn scan_token(&mut self) -> Token<'a> {
         self.skip_white_spaces();
 
         self.start = self.current;
         if let Some(c) = self.advance() {
-            if c.is_digit(10) {
+            if c.is_ascii_digit() {
                 return self.scan_number();
             }
 
@@ -252,5 +268,19 @@ impl<'a> Scanner<'a> {
         }
 
         Token::new(TokenType::Eof, "", self.line)
+    }
+}
+
+impl<'a> Iterator for Scanner<'a> {
+    type Item = Token<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.is_eof {
+            None
+        } else {
+            let token = self.scan_token();
+            self.is_eof = token.kind == TokenType::Eof;
+            Some(token)
+        }
     }
 }

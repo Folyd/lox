@@ -23,6 +23,12 @@ pub struct Chunk {
     pub lines: Vec<usize>,
 }
 
+impl Default for Chunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Chunk {
     pub fn new() -> Self {
         Chunk {
