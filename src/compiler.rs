@@ -120,12 +120,14 @@ impl<'a> Parser<'a> {
         if let Some(prefix_fn) = rule.prefix {
             prefix_fn(self);
         } else {
-            self.error("Expect expression.");
+            self.error("Parse precedence: expect expression.");
             return;
         }
 
         while precedence <= ParseRule::get_rule(self.current.kind).precedence {
             self.advance();
+            // Do not reuse the previous rule since it may have changed.
+            let rule = ParseRule::get_rule(self.previous.kind);
             if let Some(infix_fn) = rule.infix {
                 infix_fn(self);
             }
@@ -151,7 +153,7 @@ impl<'a> Parser<'a> {
 
     fn unary(&mut self) {
         let operator_kind = self.previous.kind;
-        self.expression();
+        self.parse_precedence(Precedence::Unary);
         if let TokenType::Minus = operator_kind {
             self.emit_byte(OpCode::Negate.into())
         }
@@ -206,7 +208,7 @@ impl<'a> Compiler<'a> {
 
     pub fn compile(&mut self) -> Chunk {
         let chunk = self.parser.compile();
-        chunk.disassemble("code");
+        // chunk.disassemble("code");
         chunk
     }
 }

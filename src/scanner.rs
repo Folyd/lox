@@ -151,13 +151,15 @@ impl<'a> Scanner<'a> {
         //                         | Identifier p
         self._advance_digit();
         // Look for a fractional part.
-        let mut next_two_chars = self.source[self.current..self.current + 2].chars();
-        let (maybe_dot, maybe_digit) = (next_two_chars.next(), next_two_chars.next());
-        if maybe_dot == Some('.') && matches!(maybe_digit, Some(c) if c.is_ascii_digit()) {
-            // Consume the "."
-            self.advance();
+        if self.source[self.current..].len() >= 2 {
+            let mut next_two_chars = self.source[self.current..self.current + 2].chars();
+            let (maybe_dot, maybe_digit) = (next_two_chars.next(), next_two_chars.next());
+            if maybe_dot == Some('.') && matches!(maybe_digit, Some(c) if c.is_ascii_digit()) {
+                // Consume the "."
+                self.advance();
 
-            self._advance_digit();
+                self._advance_digit();
+            }
         }
 
         self.make_token(TokenType::Number)
@@ -191,7 +193,7 @@ impl<'a> Scanner<'a> {
         self.make_token(kind)
     }
 
-    pub fn scan_token(&mut self) -> Token<'a> {
+    fn scan_token(&mut self) -> Token<'a> {
         self.skip_white_spaces();
 
         self.start = self.current;

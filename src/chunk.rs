@@ -15,6 +15,7 @@ pub enum OpCode {
     Unknown,
 }
 
+#[derive(Debug)]
 pub struct Chunk {
     pub code: Vec<u8>,
     // count: usize,

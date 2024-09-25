@@ -20,7 +20,7 @@ impl Vm {
         Vm {
             chunk: None,
             ip: 0,
-            stack: [Value::Nnon; STACK_MAX_SIZE],
+            stack: [Value::None; STACK_MAX_SIZE],
             stack_top: 0,
         }
     }
@@ -117,7 +117,8 @@ impl Vm {
             self.stack_top -= 1;
             self.stack[self.stack_top]
         } else {
-            panic!("Stack underflow")
+            // panic!("Stack underflow")
+            Value::None
         }
     }
 
