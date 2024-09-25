@@ -104,7 +104,11 @@ impl<'a> Parser<'a> {
             if self.previous.kind == TokenType::Bang
                 && !matches!(
                     self.current.kind,
-                    TokenType::True | TokenType::False | TokenType::Nil | TokenType::Bang
+                    TokenType::True
+                        | TokenType::False
+                        | TokenType::Nil
+                        | TokenType::Bang
+                        | TokenType::LeftParen
                 )
             {
                 self.error("! operator can only be used on booleans and nil.");
