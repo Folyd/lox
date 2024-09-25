@@ -147,28 +147,13 @@ impl<'a> Scanner<'a> {
         self.make_token(TokenType::Number)
     }
 
-    fn check_keyword(
-        &mut self,
-        start: usize,
-        length: usize,
-        rest: &str,
-        kind: TokenType,
-    ) -> Token<'_> {
-        if self.current - self.start == start + length
-            && &self.source[self.start + start..self.current] == rest
-        {
-            return self.make_token(kind);
-        }
-        self.make_token(TokenType::Identifier)
-    }
-
     fn scan_identifier(&mut self) -> Token<'_> {
         while matches!(self.peek(), Some(c) if c.is_alphanumeric() || *c == '_') {
             self.advance();
         }
 
         let kind = match &self.source[self.start..self.current] {
-            "and" => TokenType::Identifier,
+            "and" => TokenType::And,
             "class" => TokenType::Class,
             "else" => TokenType::Else,
             "false" => TokenType::False,
@@ -216,7 +201,7 @@ impl<'a> Scanner<'a> {
                 '/' => return self.make_token(TokenType::Slash),
                 '*' => return self.make_token(TokenType::Star),
                 '!' => {
-                    return if self.source[self.current - 1..=self.current].starts_with("!=") {
+                    return if &self.source[self.current - 1..=self.current] == "!=" {
                         self.advance();
                         self.make_token(TokenType::BangEqual)
                     } else {
@@ -224,7 +209,7 @@ impl<'a> Scanner<'a> {
                     };
                 }
                 '=' => {
-                    return if self.source[self.current - 1..=self.current].starts_with("==") {
+                    return if &self.source[self.current - 1..=self.current] == "==" {
                         self.advance();
                         self.make_token(TokenType::EqualEqual)
                     } else {
@@ -232,7 +217,7 @@ impl<'a> Scanner<'a> {
                     };
                 }
                 '<' => {
-                    return if self.source[self.current - 1..=self.current].starts_with("<=") {
+                    return if &self.source[self.current - 1..=self.current] == "<=" {
                         self.advance();
                         self.make_token(TokenType::LessEqual)
                     } else {
@@ -240,7 +225,7 @@ impl<'a> Scanner<'a> {
                     };
                 }
                 '>' => {
-                    return if self.source[self.current - 1..=self.current].starts_with(">=") {
+                    return if &self.source[self.current - 1..=self.current] == ">=" {
                         self.advance();
                         self.make_token(TokenType::GreaterEqual)
                     } else {

@@ -4,6 +4,7 @@ const STACK_MAX_SIZE: usize = 256;
 
 pub enum InterpretResult {
     Ok,
+    #[allow(unused)]
     CompileError,
     RuntimeError,
 }
