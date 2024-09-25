@@ -20,7 +20,7 @@ impl Vm {
         Vm {
             chunk: None,
             ip: 0,
-            stack: [Value::None; STACK_MAX_SIZE],
+            stack: [Value::Nil; STACK_MAX_SIZE],
             stack_top: 0,
         }
     }
@@ -95,6 +95,28 @@ impl Vm {
                     println!();
                     return InterpretResult::Ok;
                 }
+                OpCode::Nil => self.push_stack(Value::Nil),
+                OpCode::True => self.push_stack(Value::Boolean(true)),
+                OpCode::False => self.push_stack(Value::Boolean(false)),
+                OpCode::Not => {
+                    let v = self.pop_stack().as_boolean().unwrap();
+                    self.push_stack((!v).into())
+                }
+                OpCode::Equal => {
+                    let b = self.pop_stack();
+                    let a = self.pop_stack();
+                    self.push_stack((a == b).into());
+                }
+                OpCode::Greater => {
+                    let b = self.pop_stack().as_number().unwrap();
+                    let a = self.pop_stack().as_number().unwrap();
+                    self.push_stack((a > b).into());
+                }
+                OpCode::Less => {
+                    let b = self.pop_stack().as_number().unwrap();
+                    let a = self.pop_stack().as_number().unwrap();
+                    self.push_stack((a < b).into());
+                }
                 OpCode::Unknown => return InterpretResult::RuntimeError,
             }
         }
@@ -118,7 +140,7 @@ impl Vm {
             self.stack[self.stack_top]
         } else {
             // panic!("Stack underflow")
-            Value::None
+            Value::Nil
         }
     }
 

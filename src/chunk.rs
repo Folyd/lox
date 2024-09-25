@@ -12,6 +12,13 @@ pub enum OpCode {
     Multiply,
     Divide,
     Negate,
+    Nil,
+    True,
+    False,
+    Not,
+    Equal,
+    Greater,
+    Less,
     Unknown,
 }
 
@@ -49,7 +56,7 @@ impl Chunk {
     }
 
     pub fn add_constant(&mut self, value: f64) -> usize {
-        self.constans.push(Value::Const(value));
+        self.constans.push(Value::Number(value));
         // return the index where the constant
         // was appended so that we can locate that same constant later
         self.constans.len() - 1
@@ -84,6 +91,13 @@ impl Chunk {
                 OpCode::Multiply => return simple_instruction("OP_MULTIPLY", offset),
                 OpCode::Divide => return simple_instruction("OP_DIVIDE", offset),
                 OpCode::Negate => return simple_instruction("OP_NEGATE", offset),
+                OpCode::Nil => return simple_instruction("OP_NIL", offset),
+                OpCode::True => return simple_instruction("OP_TRUE", offset),
+                OpCode::False => return simple_instruction("OP_FALSE", offset),
+                OpCode::Not => return simple_instruction("OP_NOT", offset),
+                OpCode::Equal => return simple_instruction("OP_EQUAL", offset),
+                OpCode::Greater => return simple_instruction("OP_GREATER", offset),
+                OpCode::Less => return simple_instruction("OP_LESS", offset),
                 OpCode::Unknown => {}
             }
         } else {
