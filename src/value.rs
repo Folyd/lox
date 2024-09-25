@@ -28,6 +28,7 @@ impl Value {
     pub fn as_boolean(self) -> Result<bool, &'static str> {
         match self {
             Value::Boolean(value) => Ok(value),
+            Value::Nil => Ok(false),
             _ => Err("cannot convert to boolean"),
         }
     }
@@ -41,7 +42,7 @@ impl Value {
     }
 
     pub fn is_boolean(self) -> bool {
-        matches!(self, Value::Boolean(_))
+        matches!(self, Value::Boolean(_) | Value::Nil)
     }
 }
 

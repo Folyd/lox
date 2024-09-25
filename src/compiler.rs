@@ -101,6 +101,16 @@ impl<'a> Parser<'a> {
         self.previous = mem::take(&mut self.current);
         while let Some(token) = self.scanner.next() {
             self.current = token;
+            if self.previous.kind == TokenType::Bang
+                && !matches!(
+                    self.current.kind,
+                    TokenType::True | TokenType::False | TokenType::Nil | TokenType::Bang
+                )
+            {
+                self.error("! operator can only be used on booleans and nil.");
+                break;
+            }
+
             if self.current.kind != TokenType::Error {
                 break;
             }
@@ -224,9 +234,7 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn compile(&mut self) -> Chunk {
-        let chunk = self.parser.compile();
-        // chunk.disassemble("code");
-        chunk
+        self.parser.compile()
     }
 }
 
