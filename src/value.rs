@@ -1,10 +1,10 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Number(f64),
     Boolean(bool),
-    String(String),
+    String(Arc<str>),
     Nil,
 }
 
@@ -35,7 +35,7 @@ impl Value {
         }
     }
 
-    pub fn as_string(self) -> Result<String, &'static str> {
+    pub fn as_string(self) -> Result<Arc<str>, &'static str> {
         match self {
             Value::String(value) => Ok(value),
             _ => Err("cannot convert to string"),
@@ -69,6 +69,6 @@ impl From<bool> for Value {
 
 impl From<&str> for Value {
     fn from(value: &str) -> Self {
-        Value::String(String::from(value))
+        Value::String(Arc::from(value))
     }
 }

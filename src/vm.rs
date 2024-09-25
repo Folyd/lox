@@ -74,10 +74,9 @@ impl Vm {
                         self.push_stack((a + b).into());
                     }
                     (Value::String(_), Value::String(_)) => {
-                        let mut a = self.pop_stack().as_string().unwrap();
+                        let a = self.pop_stack().as_string().unwrap();
                         let b = self.pop_stack().as_string().unwrap();
-                        a.push_str(&b);
-                        self.push_stack((&*a).into());
+                        self.push_stack(Value::from(&*format!("{a}{b}")));
                     }
                     _ => {
                         return InterpretResult::RuntimeError(
