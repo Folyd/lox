@@ -1,9 +1,10 @@
 use std::fmt::Display;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Number(f64),
     Boolean(bool),
+    String(String),
     Nil,
 }
 
@@ -12,6 +13,7 @@ impl Display for Value {
         match self {
             Value::Number(v) => write!(f, "{}", v),
             Value::Boolean(b) => write!(f, "{}", b),
+            Value::String(s) => write!(f, "{}", s),
             Value::Nil => write!(f, ""),
         }
     }
@@ -30,6 +32,13 @@ impl Value {
             Value::Boolean(value) => Ok(value),
             Value::Nil => Ok(false),
             _ => Err("cannot convert to boolean"),
+        }
+    }
+
+    pub fn as_string(self) -> Result<String, &'static str> {
+        match self {
+            Value::String(value) => Ok(value),
+            _ => Err("cannot convert to string"),
         }
     }
 
@@ -55,5 +64,11 @@ impl From<f64> for Value {
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
         Value::Boolean(value)
+    }
+}
+
+impl From<&str> for Value {
+    fn from(value: &str) -> Self {
+        Value::String(String::from(value))
     }
 }

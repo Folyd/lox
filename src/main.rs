@@ -29,7 +29,10 @@ fn run_file(path: &str) {
     let mut vm = Vm::new();
     match vm.interpret(&source) {
         vm::InterpretResult::CompileError => exit(70),
-        vm::InterpretResult::RuntimeError => exit(70),
+        vm::InterpretResult::RuntimeError(err) => {
+            println!("RuntimeError: {err}");
+            exit(70)
+        }
         _ => {}
     }
 }
@@ -38,17 +41,17 @@ fn run_file(path: &str) {
 fn test() {
     let mut chunk = Chunk::new();
     let line = 123;
-    let pos = chunk.add_constant(1.2);
+    let pos = chunk.add_constant(1.2.into());
     chunk.write_code(OpCode::Constant, line);
     chunk.write_byte(pos as u8, line);
 
-    let pos = chunk.add_constant(3.4);
+    let pos = chunk.add_constant(3.4.into());
     chunk.write_code(OpCode::Constant, line);
     chunk.write_byte(pos as u8, line);
 
     chunk.write_code(OpCode::Add, line);
 
-    let pos = chunk.add_constant(5.6);
+    let pos = chunk.add_constant(5.6.into());
     chunk.write_code(OpCode::Constant, 123);
     chunk.write_byte(pos as u8, 123);
 

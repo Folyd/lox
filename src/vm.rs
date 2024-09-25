@@ -1,4 +1,6 @@
-use crate::{chunk::print_value, compiler::Compiler, Chunk, OpCode, Value};
+use std::array;
+
+use crate::{compiler::Compiler, Chunk, OpCode, Value};
 
 const STACK_MAX_SIZE: usize = 256;
 
@@ -6,7 +8,7 @@ pub enum InterpretResult {
     Ok,
     #[allow(unused)]
     CompileError,
-    RuntimeError,
+    RuntimeError(&'static str),
 }
 pub struct Vm {
     chunk: Option<Chunk>,
@@ -20,7 +22,7 @@ impl Vm {
         Vm {
             chunk: None,
             ip: 0,
-            stack: [Value::Nil; STACK_MAX_SIZE],
+            stack: array::from_fn(|_| Value::Nil),
             stack_top: 0,
         }
     }
@@ -65,11 +67,24 @@ impl Vm {
                     // println!();
                     // break;
                 }
-                OpCode::Add => {
-                    let b = self.pop_stack().as_number().unwrap();
-                    let a = self.pop_stack().as_number().unwrap();
-                    self.push_stack((a + b).into());
-                }
+                OpCode::Add => match (self.peek(0), self.peek(1)) {
+                    (Value::Number(_), Value::Number(_)) => {
+                        let a = self.pop_stack().as_number().unwrap();
+                        let b = self.pop_stack().as_number().unwrap();
+                        self.push_stack((a + b).into());
+                    }
+                    (Value::String(_), Value::String(_)) => {
+                        let mut a = self.pop_stack().as_string().unwrap();
+                        let b = self.pop_stack().as_string().unwrap();
+                        a.push_str(&b);
+                        self.push_stack((&*a).into());
+                    }
+                    _ => {
+                        return InterpretResult::RuntimeError(
+                            "Operands must be two numbers or two strings.",
+                        )
+                    }
+                },
                 OpCode::Subtract => {
                     let b = self.pop_stack().as_number().unwrap();
                     let a = self.pop_stack().as_number().unwrap();
@@ -91,7 +106,7 @@ impl Vm {
                 }
                 OpCode::Return => {
                     let value = self.pop_stack();
-                    print_value(&value);
+                    print!("{value}");
                     println!();
                     return InterpretResult::Ok;
                 }
@@ -117,7 +132,7 @@ impl Vm {
                     let a = self.pop_stack().as_number().unwrap();
                     self.push_stack((a < b).into());
                 }
-                OpCode::Unknown => return InterpretResult::RuntimeError,
+                OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode"),
             }
         }
         // InterpretResult::Ok
@@ -137,18 +152,22 @@ impl Vm {
     fn pop_stack(&mut self) -> Value {
         if self.stack_top > 0 {
             self.stack_top -= 1;
-            self.stack[self.stack_top]
+            self.stack[self.stack_top].clone()
         } else {
             // panic!("Stack underflow")
             Value::Nil
         }
     }
 
+    fn peek(&self, distance: usize) -> &Value {
+        &self.stack[self.stack_top - 1 - distance]
+    }
+
     fn print_stack(&self) {
         print!("          ");
         for value in self.stack.iter().take(self.stack_top) {
             print!("[");
-            print_value(value);
+            print!("{value}");
             print!("]")
         }
         println!();

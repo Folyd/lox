@@ -2,7 +2,7 @@ use std::{mem, ops::Add};
 
 use crate::{
     scanner::{Scanner, Token, TokenType},
-    Chunk, OpCode,
+    Chunk, OpCode, Value,
 };
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
@@ -76,7 +76,7 @@ impl<'a> Parser<'a> {
         self.emit_byte(OpCode::Return.into());
     }
 
-    fn emity_constant(&mut self, value: f64) {
+    fn emity_constant(&mut self, value: Value) {
         let constant = self.chunk.add_constant(value);
         if constant > u8::MAX as usize {
             self.error("Too many constants in one chunk.");
@@ -165,8 +165,13 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn string(&mut self) {
+        let string = self.previous.origin.trim_matches('"');
+        self.emity_constant(string.into());
+    }
+
     fn number(&mut self) {
-        self.emity_constant(self.previous.origin.parse().unwrap());
+        self.emity_constant(self.previous.origin.parse::<f64>().unwrap().into());
     }
 
     fn grouping(&mut self) {
@@ -281,7 +286,7 @@ impl<'a> ParseRule<'a> {
             TokenType::Less => Self::new(None, Some(Parser::binary), Precedence::Comparison),
             TokenType::LessEqual => Self::new(None, Some(Parser::binary), Precedence::Comparison),
             TokenType::Identifier => Self::new(None, None, Precedence::None),
-            TokenType::String => Self::new(None, None, Precedence::None),
+            TokenType::String => Self::new(Some(Parser::string), None, Precedence::None),
             TokenType::Number => Self::new(Some(Parser::number), None, Precedence::None),
             TokenType::And => Self::new(None, None, Precedence::None),
             TokenType::Class => Self::new(None, None, Precedence::None),

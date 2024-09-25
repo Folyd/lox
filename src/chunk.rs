@@ -55,15 +55,15 @@ impl Chunk {
         self.lines.push(line);
     }
 
-    pub fn add_constant(&mut self, value: f64) -> usize {
-        self.constans.push(Value::Number(value));
+    pub fn add_constant(&mut self, value: Value) -> usize {
+        self.constans.push(value);
         // return the index where the constant
         // was appended so that we can locate that same constant later
         self.constans.len() - 1
     }
 
     pub fn read_constant(&self, byte: u8) -> Value {
-        self.constans[byte as usize]
+        self.constans[byte as usize].clone()
     }
 
     pub fn disassemble(&self, name: &str) {
@@ -116,11 +116,7 @@ fn simple_instruction(name: &str, offset: usize) -> usize {
 fn constant_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
     let constant = chunk.code[offset + 1];
     print!("{:-16} {:04} ", name, constant);
-    print_value(&chunk.constans[constant as usize]);
+    print!("{}", chunk.constans[constant as usize]);
     println!();
     offset + 2
-}
-
-pub fn print_value(value: &Value) {
-    print!("{}", value);
 }
