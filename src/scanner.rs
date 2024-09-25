@@ -1,6 +1,5 @@
 use std::{iter::Peekable, str::Chars};
 
-#[allow(unused)]
 #[derive(Debug)]
 pub enum TokenType {
     LeftParen,
@@ -132,6 +131,8 @@ impl<'a> Scanner<'a> {
     }
 
     fn scan_number(&mut self) -> Token {
+        // TODO: fix this: 0p =>  19 Number 0
+        //                         | Identifier p
         self._advance_digit();
         // Look for a fractional part.
         let mut next_two_chars = self.source[self.current..self.current + 2].chars();
@@ -162,47 +163,31 @@ impl<'a> Scanner<'a> {
     }
 
     fn scan_identifier(&mut self) -> Token<'_> {
-        while matches!(self.peek(), Some(c) if c.is_alphanumeric()) {
+        while matches!(self.peek(), Some(c) if c.is_alphanumeric() || *c == '_') {
             self.advance();
         }
 
-        let mut chars = self.source[self.start..self.current].chars();
-        if let Some(c) = chars.next() {
-            match c {
-                'a' => return self.check_keyword(1, 2, "nd", TokenType::And),
-                'c' => return self.check_keyword(1, 4, "lass", TokenType::Class),
-                'e' => return self.check_keyword(1, 3, "lse", TokenType::Else),
-                'f' => {
-                    if let Some(c) = chars.next() {
-                        match c {
-                            'a' => return self.check_keyword(2, 3, "lse", TokenType::False),
-                            'o' => return self.check_keyword(2, 1, "r", TokenType::For),
-                            'u' => return self.check_keyword(2, 1, "n", TokenType::Fun),
-                            _ => {}
-                        }
-                    }
-                }
-                'i' => return self.check_keyword(1, 1, "f", TokenType::If),
-                'n' => return self.check_keyword(1, 2, "il", TokenType::Nil),
-                'o' => return self.check_keyword(1, 1, "r", TokenType::Or),
-                'p' => return self.check_keyword(1, 4, "rint", TokenType::Print),
-                'r' => return self.check_keyword(1, 5, "eturn", TokenType::Return),
-                's' => return self.check_keyword(1, 4, "uper", TokenType::Super),
-                't' => {
-                    if let Some(c) = chars.next() {
-                        match c {
-                            'h' => return self.check_keyword(2, 2, "is", TokenType::This),
-                            'r' => return self.check_keyword(2, 2, "ue", TokenType::True),
-                            _ => {}
-                        }
-                    }
-                }
-                'v' => return self.check_keyword(1, 2, "ar", TokenType::Var),
-                'w' => return self.check_keyword(1, 4, "hile", TokenType::While),
-                _ => {}
-            }
-        }
-        self.make_token(TokenType::Identifier)
+        let kind = match &self.source[self.start..self.current] {
+            "and" => TokenType::Identifier,
+            "class" => TokenType::Class,
+            "else" => TokenType::Else,
+            "false" => TokenType::False,
+            "for" => TokenType::For,
+            "fun" => TokenType::Fun,
+            "if" => TokenType::If,
+            "nil" => TokenType::Nil,
+            "or" => TokenType::Or,
+            "print" => TokenType::Print,
+            "return" => TokenType::Return,
+            "super" => TokenType::Super,
+            "this" => TokenType::This,
+            "true" => TokenType::True,
+            "var" => TokenType::Var,
+            "while" => TokenType::While,
+            _ => TokenType::Identifier,
+        };
+
+        self.make_token(kind)
     }
 
     pub fn scan_token(&mut self) -> Token {

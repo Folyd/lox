@@ -11,5 +11,11 @@ and
 class
 fun
 test
-true
-this
+if (true) {
+    var a = _g1;
+    var g_1 = _g1;
+}
+true_
+_or
+thisf
+0p
