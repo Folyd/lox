@@ -63,6 +63,15 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn make_constant(&mut self, value: Value) -> usize {
+        let constant = self.chunk.add_constant(value);
+        if constant > u8::MAX as usize {
+            self.error("Too many constants in one chunk.");
+            return 0;
+        }
+        constant
+    }
+
     fn emit_byte(&mut self, byte: u8) {
         self.chunk.write_byte(byte, self.previous.line);
     }
@@ -77,23 +86,82 @@ impl<'a> Parser<'a> {
     }
 
     fn emity_constant(&mut self, value: Value) {
-        let constant = self.chunk.add_constant(value);
-        if constant > u8::MAX as usize {
-            self.error("Too many constants in one chunk.");
-            return;
-        }
+        let constant = self.make_constant(value);
         self.emit_bytes(OpCode::Constant.into(), constant as u8);
     }
 }
 
 impl<'a> Parser<'a> {
     fn declaration(&mut self) {
-        self.statement();
+        if self._match(TokenType::Var) {
+            self.var_decaration();
+        } else {
+            self.statement();
+        }
+
+        if self.panic_mode {
+            self.synchronize();
+        }
+    }
+
+    fn synchronize(&mut self) {
+        self.panic_mode = false;
+
+        while self.current.kind != TokenType::Eof {
+            if self.previous.kind == TokenType::Semicolon {
+                return;
+            }
+
+            match self.current.kind {
+                TokenType::Class
+                | TokenType::Fun
+                | TokenType::Var
+                | TokenType::For
+                | TokenType::If
+                | TokenType::While
+                | TokenType::Print
+                | TokenType::Return => return,
+                _ => self.advance(),
+            }
+        }
+    }
+
+    fn var_decaration(&mut self) {
+        let global = self.parse_variable("Expect variable name.");
+
+        if self._match(TokenType::Equal) {
+            self.expression();
+        } else {
+            // desugars a variable declaration like: var a;
+            // into: var a = nil;
+            self.emit_byte(OpCode::Nil.into());
+        }
+
+        self.consume(
+            TokenType::Semicolon,
+            "Expect ';' after variable declaration.",
+        );
+        self.define_variable(global);
+    }
+
+    fn parse_variable(&mut self, error_message: &str) -> usize {
+        self.consume(TokenType::Identifier, error_message);
+        self.identifier_constant(self.previous.origin)
+    }
+
+    fn identifier_constant(&mut self, identifier: &str) -> usize {
+        self.make_constant(identifier.into())
+    }
+
+    fn define_variable(&mut self, global: usize) {
+        self.emit_bytes(OpCode::DefineGlobal.into(), global as u8);
     }
 
     fn statement(&mut self) {
         if self._match(TokenType::Print) {
             self.print_statement();
+        } else {
+            self.expression_statement();
         }
     }
 
@@ -113,6 +181,12 @@ impl<'a> Parser<'a> {
         self.expression();
         self.consume(TokenType::Semicolon, "Expect ';' after value.");
         self.emit_byte(OpCode::Print.into());
+    }
+
+    fn expression_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::Semicolon, "Expect ';' after expression.");
+        self.emit_byte(OpCode::Pop.into());
     }
 }
 

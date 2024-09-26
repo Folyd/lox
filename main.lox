@@ -1,4 +1,5 @@
 // (-1 + 2) * 3 - -4;
-print !(5 - 4 > 3 * 2 == !nil);
+// print !(5 - 4 > 3 * 2 == !nil);
 print "hello" + "hellox";
-print 1;
+var a = 1;
+// print a;

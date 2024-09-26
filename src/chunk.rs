@@ -20,6 +20,8 @@ pub enum OpCode {
     Greater,
     Less,
     Print,
+    Pop,
+    DefineGlobal,
     Unknown,
 }
 
@@ -100,6 +102,10 @@ impl Chunk {
                 OpCode::Greater => return simple_instruction("OP_GREATER", offset),
                 OpCode::Less => return simple_instruction("OP_LESS", offset),
                 OpCode::Print => return simple_instruction("OP_PRINT", offset),
+                OpCode::Pop => return simple_instruction("OP_POP", offset),
+                OpCode::DefineGlobal => {
+                    return constant_instruction("OP_DEFINE_GLOBAL", self, offset)
+                }
                 OpCode::Unknown => {}
             }
         } else {

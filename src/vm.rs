@@ -1,5 +1,7 @@
 use std::{array, sync::Once};
 
+use ustr::UstrMap;
+
 use crate::{compiler::Compiler, Chunk, OpCode, Value};
 
 const STACK_MAX_SIZE: usize = 256;
@@ -14,15 +16,17 @@ pub struct Vm {
     ip: usize,
     stack: [Value; STACK_MAX_SIZE],
     stack_top: usize,
+    globals: UstrMap<Value>,
 }
 
 impl Vm {
-    pub fn new() -> Vm {
+    pub fn new() -> Self {
         Vm {
             chunk: None,
             ip: 0,
             stack: array::from_fn(|_| Value::Nil),
             stack_top: 0,
+            globals: UstrMap::default(),
         }
     }
 
@@ -103,9 +107,6 @@ impl Vm {
                     self.push_stack((-v).into());
                 }
                 OpCode::Return => {
-                    // let value = self.pop_stack();
-                    // print!("{value}");
-                    // println!();
                     return InterpretResult::Ok;
                 }
                 OpCode::Nil => self.push_stack(Value::Nil),
@@ -133,6 +134,21 @@ impl Vm {
                 OpCode::Print => {
                     let value = self.pop_stack();
                     println!("{value}");
+                }
+                OpCode::Pop => {
+                    self.pop_stack();
+                }
+                OpCode::DefineGlobal => {
+                    let byte = self.read_byte();
+                    let varible_name = self
+                        .chunk
+                        .as_ref()
+                        .unwrap()
+                        .read_constant(byte)
+                        .as_string()
+                        .unwrap();
+                    self.globals.insert(varible_name, self.peek(0).clone());
+                    self.pop_stack();
                 }
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode"),
             }
