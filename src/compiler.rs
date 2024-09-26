@@ -265,7 +265,7 @@ impl<'a> Parser<'a> {
         self.error_at_current(message);
     }
 
-    fn literal(&mut self, _can_assigne: bool) {
+    fn literal(&mut self, _can_assign: bool) {
         match self.previous.kind {
             TokenType::False => self.emit_byte(OpCode::False),
             TokenType::True => self.emit_byte(OpCode::True),
@@ -274,21 +274,21 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn string(&mut self, _can_assigne: bool) {
+    fn string(&mut self, _can_assign: bool) {
         let string = self.previous.origin.trim_matches('"');
         self.emity_constant(string.into());
     }
 
-    fn number(&mut self, _can_assigne: bool) {
+    fn number(&mut self, _can_assign: bool) {
         self.emity_constant(self.previous.origin.parse::<f64>().unwrap().into());
     }
 
-    fn grouping(&mut self, _can_assigne: bool) {
+    fn grouping(&mut self, _can_assign: bool) {
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after expression.");
     }
 
-    fn unary(&mut self, _can_assigne: bool) {
+    fn unary(&mut self, _can_assign: bool) {
         let operator_kind = self.previous.kind;
         self.parse_precedence(Precedence::Unary);
         match operator_kind {
@@ -298,7 +298,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn binary(&mut self, _can_assigne: bool) {
+    fn binary(&mut self, _can_assign: bool) {
         let operator_kind = self.previous.kind;
         let rule = ParseRule::get_rule(operator_kind);
         self.parse_precedence(rule.precedence + 1);
@@ -318,13 +318,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn variable(&mut self, can_assigne: bool) {
-        self.named_variable(self.previous.origin, can_assigne);
+    fn variable(&mut self, can_assign: bool) {
+        self.named_variable(self.previous.origin, can_assign);
     }
 
-    fn named_variable(&mut self, name: &str, can_assigne: bool) {
+    fn named_variable(&mut self, name: &str, can_assign: bool) {
         let pos = self.identifier_constant(name);
-        if can_assigne && self._match(TokenType::Equal) {
+        if can_assign && self._match(TokenType::Equal) {
             self.expression();
             self.emit_bytes(OpCode::SetGlobal, pos as u8);
         } else {
