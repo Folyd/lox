@@ -23,6 +23,7 @@ pub enum OpCode {
     Pop,
     DefineGlobal,
     GetGlobal,
+    SetGlobal,
     Unknown,
 }
 
@@ -108,6 +109,7 @@ impl Chunk {
                     return self.constant_instruction("OP_DEFINE_GLOBAL", offset)
                 }
                 OpCode::GetGlobal => return self.constant_instruction("OP_GET_GLOBAL", offset),
+                OpCode::SetGlobal => return self.constant_instruction("OP_SET_GLOBAL", offset),
                 OpCode::Unknown => {}
             }
         } else {

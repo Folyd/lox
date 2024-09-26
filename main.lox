@@ -4,6 +4,8 @@ print "hello" + "hellox";
 var a = 1;
 print a;
 
+var breakfast = "beignets";
 var beverage = "cafe au lait";
-var breakfast = "beignets with " + beverage;
+breakfast = "beignets with " + beverage;
+a + 1 = breakfast;
 print breakfast;

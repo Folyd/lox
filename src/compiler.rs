@@ -319,7 +319,12 @@ impl<'a> Parser<'a> {
 
     fn named_variable(&mut self, name: &str) {
         let pos = self.identifier_constant(name);
-        self.emit_bytes(OpCode::GetGlobal, pos as u8);
+        if self._match(TokenType::Equal) {
+            self.expression();
+            self.emit_bytes(OpCode::SetGlobal, pos as u8);
+        } else {
+            self.emit_bytes(OpCode::GetGlobal, pos as u8);
+        }
     }
 
     fn error_at_current(&mut self, message: &str) {

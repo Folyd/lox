@@ -167,10 +167,27 @@ impl Vm {
                         );
                     }
                 }
+                OpCode::SetGlobal => {
+                    let byte = self.read_byte();
+                    let varible_name = self
+                        .chunk
+                        .as_ref()
+                        .unwrap()
+                        .read_constant(byte)
+                        .as_string()
+                        .unwrap();
+                    #[allow(clippy::map_entry)]
+                    if self.globals.contains_key(&varible_name) {
+                        self.globals.insert(varible_name, self.peek(0).clone());
+                    } else {
+                        return InterpretResult::RuntimeError(
+                            format!("Undefined variable '{}'", varible_name).into(),
+                        );
+                    }
+                }
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }
         }
-        // InterpretResult::Ok
     }
 }
 
