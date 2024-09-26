@@ -104,9 +104,9 @@ impl Vm {
                     self.push_stack((-v).into());
                 }
                 OpCode::Return => {
-                    let value = self.pop_stack();
-                    print!("{value}");
-                    println!();
+                    // let value = self.pop_stack();
+                    // print!("{value}");
+                    // println!();
                     return InterpretResult::Ok;
                 }
                 OpCode::Nil => self.push_stack(Value::Nil),
@@ -130,6 +130,10 @@ impl Vm {
                     let b = self.pop_stack().as_number().unwrap();
                     let a = self.pop_stack().as_number().unwrap();
                     self.push_stack((a < b).into());
+                }
+                OpCode::Print => {
+                    let value = self.pop_stack();
+                    println!("{value}");
                 }
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode"),
             }

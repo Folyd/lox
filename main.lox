@@ -1,3 +1,4 @@
 // (-1 + 2) * 3 - -4;
-// !(5 - 4 > 3 * 2 == !nil)
-"hello" + "hellox"
+print !(5 - 4 > 3 * 2 == !nil);
+print "hello" + "hellox";
+print 1;

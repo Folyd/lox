@@ -87,11 +87,41 @@ impl<'a> Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
+    fn declaration(&mut self) {
+        self.statement();
+    }
+
+    fn statement(&mut self) {
+        if self._match(TokenType::Print) {
+            self.print_statement();
+        }
+    }
+
+    fn _match(&mut self, kind: TokenType) -> bool {
+        if self.check(kind) {
+            self.advance();
+            return true;
+        }
+        false
+    }
+
+    fn check(&mut self, kind: TokenType) -> bool {
+        self.current.kind == kind
+    }
+
+    fn print_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::Semicolon, "Expect ';' after value.");
+        self.emit_byte(OpCode::Print.into());
+    }
+}
+
+impl<'a> Parser<'a> {
     fn compile(&mut self) -> Chunk {
         self.advance();
-        self.expression();
-        self.consume(TokenType::Eof, "Expect end of expression.");
-
+        while !self._match(TokenType::Eof) {
+            self.declaration();
+        }
         self.emit_return();
 
         mem::take(&mut self.chunk)

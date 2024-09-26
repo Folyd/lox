@@ -19,6 +19,7 @@ pub enum OpCode {
     Equal,
     Greater,
     Less,
+    Print,
     Unknown,
 }
 
@@ -98,6 +99,7 @@ impl Chunk {
                 OpCode::Equal => return simple_instruction("OP_EQUAL", offset),
                 OpCode::Greater => return simple_instruction("OP_GREATER", offset),
                 OpCode::Less => return simple_instruction("OP_LESS", offset),
+                OpCode::Print => return simple_instruction("OP_PRINT", offset),
                 OpCode::Unknown => {}
             }
         } else {
