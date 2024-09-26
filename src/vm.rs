@@ -47,8 +47,8 @@ impl Vm {
     }
 
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
-        let mut compiler = Compiler::new(source);
-        self.chunk = Some(compiler.compile());
+        let mut compiler = Compiler::new();
+        self.chunk = Some(compiler.compile(source));
         self.run()
     }
 
@@ -184,6 +184,14 @@ impl Vm {
                             format!("Undefined variable '{}'", varible_name).into(),
                         );
                     }
+                }
+                OpCode::GetLocal => {
+                    let slot = self.read_byte();
+                    self.push_stack(self.stack[slot as usize].clone());
+                }
+                OpCode::SetLocal => {
+                    let slot = self.read_byte();
+                    self.stack[slot as usize] = self.peek(0).clone();
                 }
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }

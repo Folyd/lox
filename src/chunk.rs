@@ -24,14 +24,14 @@ pub enum OpCode {
     DefineGlobal,
     GetGlobal,
     SetGlobal,
+    GetLocal,
+    SetLocal,
     Unknown,
 }
 
 #[derive(Debug)]
 pub struct Chunk {
     pub code: Vec<u8>,
-    // count: usize,
-    // capacity: usize,
     pub constans: Vec<Value>,
     pub lines: Vec<usize>,
 }
@@ -110,6 +110,8 @@ impl Chunk {
                 }
                 OpCode::GetGlobal => return self.constant_instruction("OP_GET_GLOBAL", offset),
                 OpCode::SetGlobal => return self.constant_instruction("OP_SET_GLOBAL", offset),
+                OpCode::GetLocal => return self.byte_instruction("OP_GET_LOCAL", offset),
+                OpCode::SetLocal => return self.byte_instruction("OP_SET_LOCAL", offset),
                 OpCode::Unknown => {}
             }
         } else {
@@ -121,9 +123,16 @@ impl Chunk {
 
     fn constant_instruction(&self, name: &str, offset: usize) -> usize {
         let constant = self.code[offset + 1];
-        print!("{:-16} {:04} ", name, constant);
-        print!("{}", self.constans[constant as usize]);
-        println!();
+        println!(
+            "{:-16} {:04} {}",
+            name, constant, self.constans[constant as usize]
+        );
+        offset + 2
+    }
+
+    fn byte_instruction(&self, name: &str, offset: usize) -> usize {
+        let slot = self.code[offset + 1];
+        println!("{:-16} {:04}", name, slot);
         offset + 2
     }
 }
