@@ -72,22 +72,22 @@ impl<'a> Parser<'a> {
         constant
     }
 
-    fn emit_byte(&mut self, byte: u8) {
+    fn emit_byte<T: Into<u8>>(&mut self, byte: T) {
         self.chunk.write_byte(byte, self.previous.line);
     }
 
-    fn emit_bytes(&mut self, byte1: u8, byte2: u8) {
+    fn emit_bytes<T1: Into<u8>, T2: Into<u8>>(&mut self, byte1: T1, byte2: T2) {
         self.chunk.write_byte(byte1, self.previous.line);
         self.chunk.write_byte(byte2, self.previous.line);
     }
 
     fn emit_return(&mut self) {
-        self.emit_byte(OpCode::Return.into());
+        self.emit_byte(OpCode::Return);
     }
 
     fn emity_constant(&mut self, value: Value) {
         let constant = self.make_constant(value);
-        self.emit_bytes(OpCode::Constant.into(), constant as u8);
+        self.emit_bytes(OpCode::Constant, constant as u8);
     }
 }
 
@@ -134,7 +134,7 @@ impl<'a> Parser<'a> {
         } else {
             // desugars a variable declaration like: var a;
             // into: var a = nil;
-            self.emit_byte(OpCode::Nil.into());
+            self.emit_byte(OpCode::Nil);
         }
 
         self.consume(
@@ -154,7 +154,7 @@ impl<'a> Parser<'a> {
     }
 
     fn define_variable(&mut self, global: usize) {
-        self.emit_bytes(OpCode::DefineGlobal.into(), global as u8);
+        self.emit_bytes(OpCode::DefineGlobal, global as u8);
     }
 
     fn statement(&mut self) {
@@ -180,13 +180,13 @@ impl<'a> Parser<'a> {
     fn print_statement(&mut self) {
         self.expression();
         self.consume(TokenType::Semicolon, "Expect ';' after value.");
-        self.emit_byte(OpCode::Print.into());
+        self.emit_byte(OpCode::Print);
     }
 
     fn expression_statement(&mut self) {
         self.expression();
         self.consume(TokenType::Semicolon, "Expect ';' after expression.");
-        self.emit_byte(OpCode::Pop.into());
+        self.emit_byte(OpCode::Pop);
     }
 }
 
@@ -262,9 +262,9 @@ impl<'a> Parser<'a> {
 
     fn literal(&mut self) {
         match self.previous.kind {
-            TokenType::False => self.emit_byte(OpCode::False.into()),
-            TokenType::True => self.emit_byte(OpCode::True.into()),
-            TokenType::Nil => self.emit_byte(OpCode::Nil.into()),
+            TokenType::False => self.emit_byte(OpCode::False),
+            TokenType::True => self.emit_byte(OpCode::True),
+            TokenType::Nil => self.emit_byte(OpCode::Nil),
             _ => (),
         }
     }
@@ -287,8 +287,8 @@ impl<'a> Parser<'a> {
         let operator_kind = self.previous.kind;
         self.parse_precedence(Precedence::Unary);
         match operator_kind {
-            TokenType::Minus => self.emit_byte(OpCode::Negate.into()),
-            TokenType::Bang => self.emit_byte(OpCode::Not.into()),
+            TokenType::Minus => self.emit_byte(OpCode::Negate),
+            TokenType::Bang => self.emit_byte(OpCode::Not),
             _ => (),
         }
     }
@@ -299,18 +299,27 @@ impl<'a> Parser<'a> {
         self.parse_precedence(rule.precedence + 1);
 
         match operator_kind {
-            TokenType::Plus => self.emit_byte(OpCode::Add.into()),
-            TokenType::Minus => self.emit_byte(OpCode::Subtract.into()),
-            TokenType::Star => self.emit_byte(OpCode::Multiply.into()),
-            TokenType::Slash => self.emit_byte(OpCode::Divide.into()),
-            TokenType::BangEqual => self.emit_bytes(OpCode::Equal.into(), OpCode::Not.into()),
-            TokenType::EqualEqual => self.emit_byte(OpCode::Equal.into()),
-            TokenType::Greater => self.emit_byte(OpCode::Greater.into()),
-            TokenType::GreaterEqual => self.emit_bytes(OpCode::Less.into(), OpCode::Not.into()),
-            TokenType::Less => self.emit_byte(OpCode::Less.into()),
-            TokenType::LessEqual => self.emit_bytes(OpCode::Greater.into(), OpCode::Not.into()),
+            TokenType::Plus => self.emit_byte(OpCode::Add),
+            TokenType::Minus => self.emit_byte(OpCode::Subtract),
+            TokenType::Star => self.emit_byte(OpCode::Multiply),
+            TokenType::Slash => self.emit_byte(OpCode::Divide),
+            TokenType::BangEqual => self.emit_bytes(OpCode::Equal, OpCode::Not),
+            TokenType::EqualEqual => self.emit_byte(OpCode::Equal),
+            TokenType::Greater => self.emit_byte(OpCode::Greater),
+            TokenType::GreaterEqual => self.emit_bytes(OpCode::Less, OpCode::Not),
+            TokenType::Less => self.emit_byte(OpCode::Less),
+            TokenType::LessEqual => self.emit_bytes(OpCode::Greater, OpCode::Not),
             _ => (),
         }
+    }
+
+    fn variable(&mut self) {
+        self.named_variable(self.previous.origin);
+    }
+
+    fn named_variable(&mut self, name: &str) {
+        let pos = self.identifier_constant(name);
+        self.emit_bytes(OpCode::GetGlobal, pos as u8);
     }
 
     fn error_at_current(&mut self, message: &str) {
@@ -389,7 +398,7 @@ impl<'a> ParseRule<'a> {
             }
             TokenType::Less => Self::new(None, Some(Parser::binary), Precedence::Comparison),
             TokenType::LessEqual => Self::new(None, Some(Parser::binary), Precedence::Comparison),
-            TokenType::Identifier => Self::new(None, None, Precedence::None),
+            TokenType::Identifier => Self::new(Some(Parser::variable), None, Precedence::None),
             TokenType::String => Self::new(Some(Parser::string), None, Precedence::None),
             TokenType::Number => Self::new(Some(Parser::number), None, Precedence::None),
             TokenType::And => Self::new(None, None, Precedence::None),

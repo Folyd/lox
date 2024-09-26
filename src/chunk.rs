@@ -22,6 +22,7 @@ pub enum OpCode {
     Print,
     Pop,
     DefineGlobal,
+    GetGlobal,
     Unknown,
 }
 
@@ -50,11 +51,11 @@ impl Chunk {
     }
 
     pub fn write_code(&mut self, code: OpCode, line: usize) {
-        self.write_byte(code.into(), line);
+        self.write_byte(code, line);
     }
 
-    pub fn write_byte(&mut self, byte: u8, line: usize) {
-        self.code.push(byte);
+    pub fn write_byte<T: Into<u8>>(&mut self, byte: T, line: usize) {
+        self.code.push(byte.into());
         self.lines.push(line);
     }
 
@@ -88,7 +89,7 @@ impl Chunk {
         if let Some(code) = self.code.get(offset) {
             match OpCode::try_from(*code).unwrap_or(OpCode::Unknown) {
                 OpCode::Return => return simple_instruction("OP_RETURN", offset),
-                OpCode::Constant => return constant_instruction("OP_CONSTANT", self, offset),
+                OpCode::Constant => return self.constant_instruction("OP_CONSTANT", offset),
                 OpCode::Add => return simple_instruction("OP_ADD", offset),
                 OpCode::Subtract => return simple_instruction("OP_SUBTRACT", offset),
                 OpCode::Multiply => return simple_instruction("OP_MULTIPLY", offset),
@@ -104,8 +105,9 @@ impl Chunk {
                 OpCode::Print => return simple_instruction("OP_PRINT", offset),
                 OpCode::Pop => return simple_instruction("OP_POP", offset),
                 OpCode::DefineGlobal => {
-                    return constant_instruction("OP_DEFINE_GLOBAL", self, offset)
+                    return self.constant_instruction("OP_DEFINE_GLOBAL", offset)
                 }
+                OpCode::GetGlobal => return self.constant_instruction("OP_GET_GLOBAL", offset),
                 OpCode::Unknown => {}
             }
         } else {
@@ -114,17 +116,17 @@ impl Chunk {
 
         offset + 1
     }
+
+    fn constant_instruction(&self, name: &str, offset: usize) -> usize {
+        let constant = self.code[offset + 1];
+        print!("{:-16} {:04} ", name, constant);
+        print!("{}", self.constans[constant as usize]);
+        println!();
+        offset + 2
+    }
 }
 
 fn simple_instruction(name: &str, offset: usize) -> usize {
     println!("{name}");
     offset + 1
-}
-
-fn constant_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
-    let constant = chunk.code[offset + 1];
-    print!("{:-16} {:04} ", name, constant);
-    print!("{}", chunk.constans[constant as usize]);
-    println!();
-    offset + 2
 }

@@ -1,4 +1,4 @@
-use std::{array, sync::Once};
+use std::{array, borrow::Cow, sync::Once};
 
 use ustr::UstrMap;
 
@@ -9,7 +9,7 @@ pub enum InterpretResult {
     Ok,
     #[allow(unused)]
     CompileError,
-    RuntimeError(&'static str),
+    RuntimeError(Cow<'static, str>),
 }
 pub struct Vm {
     chunk: Option<Chunk>,
@@ -77,13 +77,13 @@ impl Vm {
                         self.push_stack((a + b).into());
                     }
                     (Value::String(_), Value::String(_)) => {
-                        let a = self.pop_stack().as_string().unwrap();
                         let b = self.pop_stack().as_string().unwrap();
+                        let a = self.pop_stack().as_string().unwrap();
                         self.push_stack(format!("{a}{b}").into());
                     }
                     _ => {
                         return InterpretResult::RuntimeError(
-                            "Operands must be two numbers or two strings.",
+                            "Operands must be two numbers or two strings.".into(),
                         )
                     }
                 },
@@ -150,7 +150,24 @@ impl Vm {
                     self.globals.insert(varible_name, self.peek(0).clone());
                     self.pop_stack();
                 }
-                OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode"),
+                OpCode::GetGlobal => {
+                    let byte = self.read_byte();
+                    let varible_name = self
+                        .chunk
+                        .as_ref()
+                        .unwrap()
+                        .read_constant(byte)
+                        .as_string()
+                        .unwrap();
+                    if let Some(value) = self.globals.get(&varible_name) {
+                        self.push_stack(value.clone());
+                    } else {
+                        return InterpretResult::RuntimeError(
+                            format!("Undefined variable '{}'", varible_name).into(),
+                        );
+                    }
+                }
+                OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }
         }
         // InterpretResult::Ok

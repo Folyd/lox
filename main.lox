@@ -2,4 +2,8 @@
 // print !(5 - 4 > 3 * 2 == !nil);
 print "hello" + "hellox";
 var a = 1;
-// print a;
+print a;
+
+var beverage = "cafe au lait";
+var breakfast = "beignets with " + beverage;
+print breakfast;
