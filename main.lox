@@ -7,5 +7,5 @@ print a;
 var breakfast = "beignets";
 var beverage = "cafe au lait";
 breakfast = "beignets with " + beverage;
-a + 1 = breakfast;
+// a + 1 = breakfast;
 print breakfast;

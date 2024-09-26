@@ -6,7 +6,7 @@ use crate::{
 };
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-type ParseFn<'a> = fn(&mut Parser<'a>);
+type ParseFn<'a> = fn(&mut Parser<'a>, bool /*can assign*/);
 
 struct Parser<'a> {
     scanner: Scanner<'a>,
@@ -235,8 +235,9 @@ impl<'a> Parser<'a> {
         self.advance();
         let rule = ParseRule::get_rule(self.previous.kind);
 
+        let can_assign = precedence <= Precedence::Assignment;
         if let Some(prefix_fn) = rule.prefix {
-            prefix_fn(self);
+            prefix_fn(self, can_assign);
         } else {
             self.error("Parse precedence: expect expression.");
             return;
@@ -247,8 +248,12 @@ impl<'a> Parser<'a> {
             // Do not reuse the previous rule since it may have changed.
             let rule = ParseRule::get_rule(self.previous.kind);
             if let Some(infix_fn) = rule.infix {
-                infix_fn(self);
+                infix_fn(self, can_assign);
             }
+        }
+
+        if can_assign && self._match(TokenType::Equal) {
+            self.error("Invalid assignment target.");
         }
     }
 
@@ -260,7 +265,7 @@ impl<'a> Parser<'a> {
         self.error_at_current(message);
     }
 
-    fn literal(&mut self) {
+    fn literal(&mut self, _can_assigne: bool) {
         match self.previous.kind {
             TokenType::False => self.emit_byte(OpCode::False),
             TokenType::True => self.emit_byte(OpCode::True),
@@ -269,21 +274,21 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn string(&mut self) {
+    fn string(&mut self, _can_assigne: bool) {
         let string = self.previous.origin.trim_matches('"');
         self.emity_constant(string.into());
     }
 
-    fn number(&mut self) {
+    fn number(&mut self, _can_assigne: bool) {
         self.emity_constant(self.previous.origin.parse::<f64>().unwrap().into());
     }
 
-    fn grouping(&mut self) {
+    fn grouping(&mut self, _can_assigne: bool) {
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after expression.");
     }
 
-    fn unary(&mut self) {
+    fn unary(&mut self, _can_assigne: bool) {
         let operator_kind = self.previous.kind;
         self.parse_precedence(Precedence::Unary);
         match operator_kind {
@@ -293,7 +298,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn binary(&mut self) {
+    fn binary(&mut self, _can_assigne: bool) {
         let operator_kind = self.previous.kind;
         let rule = ParseRule::get_rule(operator_kind);
         self.parse_precedence(rule.precedence + 1);
@@ -313,13 +318,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn variable(&mut self) {
-        self.named_variable(self.previous.origin);
+    fn variable(&mut self, can_assigne: bool) {
+        self.named_variable(self.previous.origin, can_assigne);
     }
 
-    fn named_variable(&mut self, name: &str) {
+    fn named_variable(&mut self, name: &str, can_assigne: bool) {
         let pos = self.identifier_constant(name);
-        if self._match(TokenType::Equal) {
+        if can_assigne && self._match(TokenType::Equal) {
             self.expression();
             self.emit_bytes(OpCode::SetGlobal, pos as u8);
         } else {
