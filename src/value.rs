@@ -1,10 +1,12 @@
-use std::{fmt::Display, sync::Arc};
+use std::fmt::Display;
+
+use ustr::Ustr;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Number(f64),
     Boolean(bool),
-    String(Arc<str>),
+    String(Ustr),
     Nil,
 }
 
@@ -35,7 +37,7 @@ impl Value {
         }
     }
 
-    pub fn as_string(self) -> Result<Arc<str>, &'static str> {
+    pub fn as_string(self) -> Result<Ustr, &'static str> {
         match self {
             Value::String(value) => Ok(value),
             _ => Err("cannot convert to string"),
@@ -67,8 +69,23 @@ impl From<bool> for Value {
     }
 }
 
+impl From<Ustr> for Value {
+    fn from(value: Ustr) -> Self {
+        Value::String(value)
+    }
+}
+
+impl From<String> for Value {
+    fn from(value: String) -> Self {
+        Value::String(intern_str(&value))
+    }
+}
 impl From<&str> for Value {
     fn from(value: &str) -> Self {
-        Value::String(Arc::from(value))
+        Value::String(intern_str(value))
     }
+}
+
+fn intern_str(s: &str) -> Ustr {
+    Ustr::from_existing(s).unwrap_or_else(|| Ustr::from(s))
 }

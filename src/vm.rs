@@ -75,7 +75,7 @@ impl Vm {
                     (Value::String(_), Value::String(_)) => {
                         let a = self.pop_stack().as_string().unwrap();
                         let b = self.pop_stack().as_string().unwrap();
-                        self.push_stack(Value::from(&*format!("{a}{b}")));
+                        self.push_stack(format!("{a}{b}").into());
                     }
                     _ => {
                         return InterpretResult::RuntimeError(
@@ -168,7 +168,10 @@ impl Vm {
     fn print_stack(&self) {
         static ONCE_TITLE: Once = Once::new();
         ONCE_TITLE.call_once(|| {
-            println!("{:4} {:4} {:16} {:04} Constvalue", "IP", "Line", "OPCode", "CIndex");
+            println!(
+                "{:4} {:4} {:16} {:04} Constvalue",
+                "IP", "Line", "OPCode", "CIndex"
+            );
         });
         print!("          ");
         for value in self.stack.iter().take(self.stack_top) {

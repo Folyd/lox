@@ -6,3 +6,4 @@ publish = false
 
 [dependencies]
 num_enum = "0.7.3"
+ustr = "1.0.0"
