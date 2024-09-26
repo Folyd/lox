@@ -80,7 +80,7 @@ impl Chunk {
         if offset > 0 && self.lines[offset] == self.lines[offset - 1] {
             print!("   | ");
         } else {
-            print!("{} ", self.lines[offset]);
+            print!("{:4} ", self.lines[offset]);
         }
 
         if let Some(code) = self.code.get(offset) {

@@ -1,9 +1,8 @@
-use std::array;
+use std::{array, sync::Once};
 
 use crate::{compiler::Compiler, Chunk, OpCode, Value};
 
 const STACK_MAX_SIZE: usize = 256;
-
 pub enum InterpretResult {
     Ok,
     #[allow(unused)]
@@ -167,6 +166,10 @@ impl Vm {
     }
 
     fn print_stack(&self) {
+        static ONCE_TITLE: Once = Once::new();
+        ONCE_TITLE.call_once(|| {
+            println!("{:4} {:4} {:16} {:04} Constvalue", "IP", "Line", "OPCode", "CIndex");
+        });
         print!("          ");
         for value in self.stack.iter().take(self.stack_top) {
             print!("[");
