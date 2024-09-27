@@ -124,6 +124,19 @@ impl<'a> Parser<'a> {
         self.chunk.code[offset] = a;
         self.chunk.code[offset + 1] = b;
     }
+
+    fn emit_loop(&mut self, loop_start: usize) {
+        self.emit_byte(OpCode::Loop);
+
+        let jump = self.chunk.code.len() - loop_start + 2;
+        if jump > u16::MAX as usize {
+            self.error("Loop body too large.");
+        }
+
+        let [a, b] = (jump as u16).to_be_bytes();
+        self.emit_byte(a);
+        self.emit_byte(b);
+    }
 }
 
 impl<'a> Parser<'a> {
@@ -241,6 +254,8 @@ impl<'a> Parser<'a> {
             self.end_scope();
         } else if self._match(TokenType::If) {
             self.if_statement();
+        } else if self._match(TokenType::While) {
+            self.while_statement();
         } else {
             self.expression_statement();
         }
@@ -262,6 +277,21 @@ impl<'a> Parser<'a> {
             self.statement();
         }
         self.patch_jump(else_jump);
+    }
+
+    fn while_statement(&mut self) {
+        let loop_start = self.chunk.code.len();
+        self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
+        self.expression();
+        self.consume(TokenType::RightParen, "Expect ')' after condition.");
+
+        let exit_jump = self.emit_jump(OpCode::JumpIfFalse);
+        self.emit_byte(OpCode::Pop);
+        self.statement();
+        self.emit_loop(loop_start);
+
+        self.patch_jump(exit_jump);
+        self.emit_byte(OpCode::Pop);
     }
 
     fn block(&mut self) {

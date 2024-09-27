@@ -26,4 +26,12 @@ if (a and 1 <= 2) {
     print "else";
 }
 
+while (a < 10) {
+    print a;
+    a = a + 1;
+    if (a == 5) {
+        print "a == 5";
+    }
+}
+
 print "end";
