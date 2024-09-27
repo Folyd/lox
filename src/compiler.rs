@@ -104,6 +104,27 @@ impl<'a> Parser<'a> {
         let constant = self.make_constant(value);
         self.emit_bytes(OpCode::Constant, constant as u8);
     }
+
+    fn emit_jump(&mut self, instruction: OpCode) -> usize {
+        self.emit_byte(instruction);
+        self.emit_byte(0xff);
+        self.emit_byte(0xff);
+        self.chunk.code.len() - 2
+    }
+
+    fn patch_jump(&mut self, offset: usize) {
+        let jump = self.chunk.code.len() - offset - 2;
+
+        if jump > u16::MAX as usize {
+            self.error("Too much code to jump over.");
+        }
+
+        // self.chunk.code[offset] = ((jump >> 8) & 0xff) as u8;
+        // self.chunk.code[offset + 1] = (jump & 0xff) as u8;
+        let [a, b] = (offset as u16).to_be_bytes();
+        self.chunk.code[offset] = a;
+        self.chunk.code[offset + 1] = b;
+    }
 }
 
 impl<'a> Parser<'a> {
@@ -219,9 +240,21 @@ impl<'a> Parser<'a> {
             self.begin_scope();
             self.block();
             self.end_scope();
+        } else if self._match(TokenType::If) {
+            self.if_statement();
         } else {
             self.expression_statement();
         }
+    }
+
+    fn if_statement(&mut self) {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
+        self.expression();
+        self.consume(TokenType::RightBrace, "Expect ')' after condition.");
+
+        let then_jump = self.emit_jump(OpCode::JumpIfFalse);
+        self.statement();
+        self.patch_jump(then_jump);
     }
 
     fn block(&mut self) {

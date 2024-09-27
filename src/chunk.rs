@@ -26,6 +26,7 @@ pub enum OpCode {
     SetGlobal,
     GetLocal,
     SetLocal,
+    JumpIfFalse,
     Unknown,
 }
 
@@ -89,29 +90,28 @@ impl Chunk {
 
         if let Some(code) = self.code.get(offset) {
             match OpCode::try_from(*code).unwrap_or(OpCode::Unknown) {
-                OpCode::Return => return simple_instruction("OP_RETURN", offset),
-                OpCode::Constant => return self.constant_instruction("OP_CONSTANT", offset),
-                OpCode::Add => return simple_instruction("OP_ADD", offset),
-                OpCode::Subtract => return simple_instruction("OP_SUBTRACT", offset),
-                OpCode::Multiply => return simple_instruction("OP_MULTIPLY", offset),
-                OpCode::Divide => return simple_instruction("OP_DIVIDE", offset),
-                OpCode::Negate => return simple_instruction("OP_NEGATE", offset),
-                OpCode::Nil => return simple_instruction("OP_NIL", offset),
-                OpCode::True => return simple_instruction("OP_TRUE", offset),
-                OpCode::False => return simple_instruction("OP_FALSE", offset),
-                OpCode::Not => return simple_instruction("OP_NOT", offset),
-                OpCode::Equal => return simple_instruction("OP_EQUAL", offset),
-                OpCode::Greater => return simple_instruction("OP_GREATER", offset),
-                OpCode::Less => return simple_instruction("OP_LESS", offset),
-                OpCode::Print => return simple_instruction("OP_PRINT", offset),
-                OpCode::Pop => return simple_instruction("OP_POP", offset),
-                OpCode::DefineGlobal => {
-                    return self.constant_instruction("OP_DEFINE_GLOBAL", offset)
-                }
-                OpCode::GetGlobal => return self.constant_instruction("OP_GET_GLOBAL", offset),
-                OpCode::SetGlobal => return self.constant_instruction("OP_SET_GLOBAL", offset),
-                OpCode::GetLocal => return self.byte_instruction("OP_GET_LOCAL", offset),
-                OpCode::SetLocal => return self.byte_instruction("OP_SET_LOCAL", offset),
+                OpCode::Return => return simple_instruction("RETURN", offset),
+                OpCode::Constant => return self.constant_instruction("CONSTANT", offset),
+                OpCode::Add => return simple_instruction("ADD", offset),
+                OpCode::Subtract => return simple_instruction("SUBTRACT", offset),
+                OpCode::Multiply => return simple_instruction("MULTIPLY", offset),
+                OpCode::Divide => return simple_instruction("DIVIDE", offset),
+                OpCode::Negate => return simple_instruction("NEGATE", offset),
+                OpCode::Nil => return simple_instruction("NIL", offset),
+                OpCode::True => return simple_instruction("TRUE", offset),
+                OpCode::False => return simple_instruction("FALSE", offset),
+                OpCode::Not => return simple_instruction("NOT", offset),
+                OpCode::Equal => return simple_instruction("EQUAL", offset),
+                OpCode::Greater => return simple_instruction("GREATER", offset),
+                OpCode::Less => return simple_instruction("LESS", offset),
+                OpCode::Print => return simple_instruction("PRINT", offset),
+                OpCode::Pop => return simple_instruction("POP", offset),
+                OpCode::DefineGlobal => return self.constant_instruction("DEFINE_GLOBAL", offset),
+                OpCode::GetGlobal => return self.constant_instruction("GET_GLOBAL", offset),
+                OpCode::SetGlobal => return self.constant_instruction("SET_GLOBAL", offset),
+                OpCode::GetLocal => return self.byte_instruction("GET_LOCAL", offset),
+                OpCode::SetLocal => return self.byte_instruction("SET_LOCAL", offset),
+                OpCode::JumpIfFalse => return self.jump_instruction("JUMP_IF_FALSE", offset),
                 OpCode::Unknown => {}
             }
         } else {
@@ -134,6 +134,17 @@ impl Chunk {
         let slot = self.code[offset + 1];
         println!("{:-16} {:04}", name, slot);
         offset + 2
+    }
+
+    fn jump_instruction(&self, name: &str, offset: usize) -> usize {
+        let jump = u16::from_be_bytes([self.code[offset + 1], self.code[offset + 2]]);
+        println!(
+            "{:-16} {:04} -> {:04}",
+            name,
+            offset,
+            offset + 3 + jump as usize
+        );
+        offset + 3
     }
 }
 

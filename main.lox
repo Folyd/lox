@@ -10,7 +10,7 @@ breakfast = "beignets with " + beverage;
 // a + 1 = breakfast;
 print breakfast;
 
-{
+if (a) {
     var b = a + 1;
     var t = 0;
     {
@@ -23,3 +23,5 @@ print breakfast;
     print b;
     print b;
 }
+
+print "end";

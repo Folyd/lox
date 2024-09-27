@@ -12,7 +12,7 @@ pub enum InterpretResult {
     RuntimeError(Cow<'static, str>),
 }
 pub struct Vm {
-    chunk: Option<Chunk>,
+    chunk: Chunk,
     ip: usize,
     stack: [Value; STACK_MAX_SIZE],
     stack_top: usize,
@@ -22,7 +22,7 @@ pub struct Vm {
 impl Vm {
     pub fn new() -> Self {
         Vm {
-            chunk: None,
+            chunk: Chunk::new(),
             ip: 0,
             stack: array::from_fn(|_| Value::Nil),
             stack_top: 0,
@@ -31,24 +31,25 @@ impl Vm {
     }
 
     fn read_byte(&mut self) -> u8 {
-        match &self.chunk {
-            Some(chunk) => {
-                let byte = chunk.code[self.ip];
-                self.ip += 1;
-                byte
-            }
-            None => 0,
-        }
+        let byte = self.chunk.code[self.ip];
+        self.ip += 1;
+        byte
+    }
+
+    fn read_short(&mut self) -> u16 {
+        let short = u16::from_be_bytes([self.chunk.code[self.ip], self.chunk.code[self.ip + 1]]);
+        self.ip += 2;
+        short
     }
 
     pub fn interpret_chunk(&mut self, chunk: Chunk) -> InterpretResult {
-        self.chunk = Some(chunk);
+        self.chunk = chunk;
         self.run()
     }
 
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let mut compiler = Compiler::new();
-        self.chunk = Some(compiler.compile(source));
+        self.chunk = compiler.compile(source);
         self.run()
     }
 
@@ -57,14 +58,11 @@ impl Vm {
             // Debug stack info
             self.print_stack();
             // Disassemble instruction for debug
-            self.chunk
-                .as_ref()
-                .unwrap()
-                .disassemble_instruction(self.ip);
+            self.chunk.disassemble_instruction(self.ip);
             match OpCode::try_from(self.read_byte()).unwrap_or(OpCode::Unknown) {
                 OpCode::Constant => {
                     let byte = self.read_byte();
-                    let constant = self.chunk.as_ref().unwrap().read_constant(byte);
+                    let constant = self.chunk.read_constant(byte);
                     self.push_stack(constant);
                     // print_value(&constant);
                     // println!();
@@ -140,25 +138,13 @@ impl Vm {
                 }
                 OpCode::DefineGlobal => {
                     let byte = self.read_byte();
-                    let varible_name = self
-                        .chunk
-                        .as_ref()
-                        .unwrap()
-                        .read_constant(byte)
-                        .as_string()
-                        .unwrap();
+                    let varible_name = self.chunk.read_constant(byte).as_string().unwrap();
                     self.globals.insert(varible_name, self.peek(0).clone());
                     self.pop_stack();
                 }
                 OpCode::GetGlobal => {
                     let byte = self.read_byte();
-                    let varible_name = self
-                        .chunk
-                        .as_ref()
-                        .unwrap()
-                        .read_constant(byte)
-                        .as_string()
-                        .unwrap();
+                    let varible_name = self.chunk.read_constant(byte).as_string().unwrap();
                     if let Some(value) = self.globals.get(&varible_name) {
                         self.push_stack(value.clone());
                     } else {
@@ -169,13 +155,7 @@ impl Vm {
                 }
                 OpCode::SetGlobal => {
                     let byte = self.read_byte();
-                    let varible_name = self
-                        .chunk
-                        .as_ref()
-                        .unwrap()
-                        .read_constant(byte)
-                        .as_string()
-                        .unwrap();
+                    let varible_name = self.chunk.read_constant(byte).as_string().unwrap();
                     #[allow(clippy::map_entry)]
                     if self.globals.contains_key(&varible_name) {
                         self.globals.insert(varible_name, self.peek(0).clone());
@@ -192,6 +172,12 @@ impl Vm {
                 OpCode::SetLocal => {
                     let slot = self.read_byte();
                     self.stack[slot as usize] = self.peek(0).clone();
+                }
+                OpCode::JumpIfFalse => {
+                    let offset = self.read_short();
+                    if self.peek(0).is_falsy() {
+                        self.ip += offset as usize;
+                    }
                 }
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }

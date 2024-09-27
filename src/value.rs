@@ -29,11 +29,12 @@ impl Value {
         }
     }
 
-    pub fn as_boolean(self) -> Result<bool, &'static str> {
+    pub fn as_boolean(&self) -> Result<bool, &'static str> {
         match self {
-            Value::Boolean(value) => Ok(value),
+            Value::Boolean(value) => Ok(*value),
             Value::Nil => Ok(false),
-            _ => Err("cannot convert to boolean"),
+            Value::Number(value) => Ok(*value != 0.0),
+            Value::String(s) => Ok(!s.is_empty()),
         }
     }
 
@@ -44,16 +45,24 @@ impl Value {
         }
     }
 
-    pub fn is_nilil(self) -> bool {
+    pub fn is_nil(&self) -> bool {
         matches!(self, Value::Nil)
     }
 
-    pub fn is_number(self) -> bool {
+    pub fn is_number(&self) -> bool {
         matches!(self, Value::Number(_))
     }
 
-    pub fn is_boolean(self) -> bool {
+    pub fn is_boolean(&self) -> bool {
         matches!(self, Value::Boolean(_) | Value::Nil)
+    }
+
+    pub fn is_true(&self) -> bool {
+        !self.is_falsy()
+    }
+
+    pub fn is_falsy(&self) -> bool {
+        self.is_nil() || !self.as_boolean().unwrap_or(false)
     }
 }
 
