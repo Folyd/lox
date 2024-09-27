@@ -10,7 +10,7 @@ breakfast = "beignets with " + beverage;
 // a + 1 = breakfast;
 print breakfast;
 
-if (a) {
+if (a and 1 <= 2) {
     var b = a + 1;
     var t = 0;
     {

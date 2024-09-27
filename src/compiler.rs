@@ -471,6 +471,24 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn and(&mut self, _can_assign: bool) {
+        let end_jump = self.emit_jump(OpCode::JumpIfFalse);
+        self.emit_byte(OpCode::Pop);
+        self.parse_precedence(Precedence::And);
+        self.patch_jump(end_jump);
+    }
+
+    fn or(&mut self, _can_assign: bool) {
+        let else_jump = self.emit_jump(OpCode::JumpIfFalse);
+        let end_jump = self.emit_jump(OpCode::Jump);
+
+        self.patch_jump(else_jump);
+        self.emit_byte(OpCode::Pop);
+
+        self.parse_precedence(Precedence::Or);
+        self.patch_jump(end_jump);
+    }
+
     fn error_at_current(&mut self, message: &str) {
         self.error_at(self.current.clone(), message);
     }
@@ -562,7 +580,7 @@ impl<'a> ParseRule<'a> {
             TokenType::Identifier => Self::new(Some(Parser::variable), None, Precedence::None),
             TokenType::String => Self::new(Some(Parser::string), None, Precedence::None),
             TokenType::Number => Self::new(Some(Parser::number), None, Precedence::None),
-            TokenType::And => Self::new(None, None, Precedence::None),
+            TokenType::And => Self::new(None, Some(Parser::and), Precedence::And),
             TokenType::Class => Self::new(None, None, Precedence::None),
             TokenType::Else => Self::new(None, None, Precedence::None),
             TokenType::False => Self::new(Some(Parser::literal), None, Precedence::None),
@@ -570,7 +588,7 @@ impl<'a> ParseRule<'a> {
             TokenType::Fun => Self::new(None, None, Precedence::None),
             TokenType::If => Self::new(None, None, Precedence::None),
             TokenType::Nil => Self::new(Some(Parser::literal), None, Precedence::None),
-            TokenType::Or => Self::new(None, None, Precedence::None),
+            TokenType::Or => Self::new(None, Some(Parser::or), Precedence::Or),
             TokenType::Print => Self::new(None, None, Precedence::None),
             TokenType::Return => Self::new(None, None, Precedence::None),
             TokenType::Super => Self::new(None, None, Precedence::None),
