@@ -14,7 +14,7 @@ if (a) {
     var b = a + 1;
     var t = 0;
     {
-        var b = b;
+        var b = "inner block";
         print b;
     }
     t = 11;
@@ -22,6 +22,8 @@ if (a) {
     b = 3;
     print b;
     print b;
+} else {
+    print "else";
 }
 
 print "end";

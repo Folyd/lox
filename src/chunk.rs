@@ -1,3 +1,5 @@
+use std::sync::Once;
+
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::Value;
@@ -27,6 +29,7 @@ pub enum OpCode {
     GetLocal,
     SetLocal,
     JumpIfFalse,
+    Jump,
     Unknown,
 }
 
@@ -74,13 +77,21 @@ impl Chunk {
 
     pub fn disassemble(&self, name: &str) {
         println!("== {name} ==");
-        let mut offset = 0usize;
+        let mut offset = 0;
         while offset < self.code.len() {
             offset = self.disassemble_instruction(offset);
         }
     }
 
     pub fn disassemble_instruction(&self, offset: usize) -> usize {
+        static ONCE_TITLE: Once = Once::new();
+        ONCE_TITLE.call_once(|| {
+            println!(
+                "{:4} {:4} {:16} {:04} Constvalue",
+                "IP", "Line", "OPCode", "CIndex"
+            );
+        });
+
         print!("{:04} ", offset);
         if offset > 0 && self.lines[offset] == self.lines[offset - 1] {
             print!("   | ");
@@ -112,6 +123,7 @@ impl Chunk {
                 OpCode::GetLocal => return self.byte_instruction("GET_LOCAL", offset),
                 OpCode::SetLocal => return self.byte_instruction("SET_LOCAL", offset),
                 OpCode::JumpIfFalse => return self.jump_instruction("JUMP_IF_FALSE", offset),
+                OpCode::Jump => return self.jump_instruction("JUMP", offset),
                 OpCode::Unknown => {}
             }
         } else {

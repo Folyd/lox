@@ -1,4 +1,4 @@
-use std::{array, borrow::Cow, sync::Once};
+use std::{array, borrow::Cow};
 
 use ustr::UstrMap;
 
@@ -50,15 +50,16 @@ impl Vm {
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let mut compiler = Compiler::new();
         self.chunk = compiler.compile(source);
+        self.chunk.disassemble("main");
         self.run()
     }
 
     fn run(&mut self) -> InterpretResult {
         loop {
             // Debug stack info
-            self.print_stack();
-            // Disassemble instruction for debug
-            self.chunk.disassemble_instruction(self.ip);
+            // self.print_stack();
+            // // Disassemble instruction for debug
+            // self.chunk.disassemble_instruction(self.ip);
             match OpCode::try_from(self.read_byte()).unwrap_or(OpCode::Unknown) {
                 OpCode::Constant => {
                     let byte = self.read_byte();
@@ -179,6 +180,10 @@ impl Vm {
                         self.ip += offset as usize;
                     }
                 }
+                OpCode::Jump => {
+                    let offset = self.read_short();
+                    self.ip += offset as usize;
+                }
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }
         }
@@ -209,14 +214,8 @@ impl Vm {
         &self.stack[self.stack_top - 1 - distance]
     }
 
+    #[allow(unused)]
     fn print_stack(&self) {
-        static ONCE_TITLE: Once = Once::new();
-        ONCE_TITLE.call_once(|| {
-            println!(
-                "{:4} {:4} {:16} {:04} Constvalue",
-                "IP", "Line", "OPCode", "CIndex"
-            );
-        });
         print!("          ");
         for value in self.stack.iter().take(self.stack_top) {
             print!("[");

@@ -114,14 +114,13 @@ impl<'a> Parser<'a> {
 
     fn patch_jump(&mut self, offset: usize) {
         let jump = self.chunk.code.len() - offset - 2;
-
         if jump > u16::MAX as usize {
             self.error("Too much code to jump over.");
         }
 
         // self.chunk.code[offset] = ((jump >> 8) & 0xff) as u8;
         // self.chunk.code[offset + 1] = (jump & 0xff) as u8;
-        let [a, b] = (offset as u16).to_be_bytes();
+        let [a, b] = (jump as u16).to_be_bytes();
         self.chunk.code[offset] = a;
         self.chunk.code[offset + 1] = b;
     }
@@ -250,11 +249,19 @@ impl<'a> Parser<'a> {
     fn if_statement(&mut self) {
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
         self.expression();
-        self.consume(TokenType::RightBrace, "Expect ')' after condition.");
+        self.consume(TokenType::RightParen, "Expect ')' after condition.");
 
         let then_jump = self.emit_jump(OpCode::JumpIfFalse);
+        self.emit_byte(OpCode::Pop);
         self.statement();
+        let else_jump = self.emit_jump(OpCode::Jump);
         self.patch_jump(then_jump);
+        self.emit_byte(OpCode::Pop);
+
+        if self._match(TokenType::Else) {
+            self.statement();
+        }
+        self.patch_jump(else_jump);
     }
 
     fn block(&mut self) {
