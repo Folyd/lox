@@ -10,7 +10,7 @@ breakfast = "beignets with " + beverage;
 // a + 1 = breakfast;
 print breakfast;
 
-if (a and 1 <= 2) {
+if (a and 1 >= 2) {
     var b = a + 1;
     var t = 0;
     {
@@ -22,16 +22,24 @@ if (a and 1 <= 2) {
     b = 3;
     print b;
     print b;
+} else if (a != 100) {
+    print "else if";
 } else {
     print "else";
 }
 
+print "while loop";
 while (a < 10) {
     print a;
     a = a + 1;
     if (a == 5) {
         print "a == 5";
     }
+}
+
+print "for loop";
+for (var i = 010; i > 0; i = i - 1) {
+    print i;
 }
 
 print "end";
