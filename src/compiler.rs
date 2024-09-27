@@ -7,6 +7,7 @@ use crate::{
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 const MAX_LOCAL_SIZE: usize = u8::MAX as usize + 1;
+const UNINITIALIZED_LOCAL_DEPTH: isize = -1;
 
 type ParseFn<'a> = fn(&mut Parser<'a>, bool /*can assign*/);
 
@@ -53,6 +54,7 @@ impl Add<u8> for Precedence {
 #[derive(Debug, Clone, Default)]
 struct Local<'a> {
     name: Token<'a>,
+    // -1 (UNINITIALIZED_LOCAL_DEPTH) means no assigned yet.
     depth: isize,
 }
 
@@ -179,7 +181,7 @@ impl<'a> Parser<'a> {
 
         self.compiler.locals[self.compiler.local_count] = Local {
             name,
-            depth: self.compiler.scope_depth,
+            depth: UNINITIALIZED_LOCAL_DEPTH,
         };
         self.compiler.local_count += 1;
     }
@@ -191,7 +193,7 @@ impl<'a> Parser<'a> {
         }
         for i in (0..self.compiler.local_count).rev() {
             let local = &self.compiler.locals[i];
-            if local.depth != -1 && local.depth < self.compiler.scope_depth {
+            if local.depth != UNINITIALIZED_LOCAL_DEPTH && local.depth < self.compiler.scope_depth {
                 break;
             }
             if local.name.origin == self.previous.origin {
@@ -203,7 +205,8 @@ impl<'a> Parser<'a> {
 
     fn define_variable(&mut self, global: usize) {
         if self.compiler.scope_depth > 0 {
-            // Encounter a local variable
+            // Encounter a local variable, set the depth to the current scope depth
+            self.compiler.locals[self.compiler.local_count - 1].depth = self.compiler.scope_depth;
             return;
         }
         self.emit_bytes(OpCode::DefineGlobal, global as u8);
@@ -267,6 +270,8 @@ impl<'a> Parser<'a> {
     fn expression_statement(&mut self) {
         self.expression();
         self.consume(TokenType::Semicolon, "Expect ';' after expression.");
+        // an expression statement evaluates the expression and discards the result
+        // since the result already exists in the stack, we can just pop it
         self.emit_byte(OpCode::Pop);
     }
 }
@@ -405,7 +410,13 @@ impl<'a> Parser<'a> {
 
     fn named_variable(&mut self, name: &str, can_assign: bool) {
         let (pos, get_op, set_op) = match self.compiler.resolve_local(name) {
-            Some(pos) => (pos, OpCode::GetLocal, OpCode::SetLocal),
+            Some((pos, depth)) => {
+                if depth == UNINITIALIZED_LOCAL_DEPTH {
+                    self.error("Can't read local variable in its own initializer.");
+                    return;
+                }
+                (pos, OpCode::GetLocal, OpCode::SetLocal)
+            }
             None => {
                 let pos = self.identifier_constant(name);
                 (pos, OpCode::GetGlobal, OpCode::SetGlobal)
@@ -456,10 +467,12 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn resolve_local(&mut self, name: &str) -> Option<usize> {
+    // Resolve a local variable by name, return its index and depth.
+    fn resolve_local(&mut self, name: &str) -> Option<(usize, isize)> {
         (0..self.local_count)
             .rev()
             .find(|&i| self.locals[i].name.origin == name)
+            .map(|i| (i, self.locals[i].depth))
     }
 
     pub fn compile(&'a mut self, source: &'a str) -> Chunk {

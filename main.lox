@@ -12,6 +12,12 @@ print breakfast;
 
 {
     var b = a + 1;
+    var t = 0;
+    {
+        var b = b;
+        print b;
+    }
+    t = 11;
     print b;
     b = 3;
     print b;
