@@ -1,6 +1,7 @@
 use std::{array, mem, ops::Add};
 
 use crate::{
+    object::Function,
     scanner::{Scanner, Token, TokenType},
     Chunk, OpCode, Value,
 };
@@ -59,7 +60,7 @@ struct Local<'a> {
 }
 
 pub struct Compiler<'a> {
-    // parser: Parser<'a>,
+    function: Function<'a>,
     locals: [Local<'a>; MAX_LOCAL_SIZE],
     local_count: usize,
     scope_depth: isize,
@@ -79,7 +80,7 @@ impl<'a> Parser<'a> {
     }
 
     fn make_constant(&mut self, value: Value) -> usize {
-        let constant = self.chunk.add_constant(value);
+        let constant = self.compiler.function.add_constant(value);
         if constant > u8::MAX as usize {
             self.error("Too many constants in one chunk.");
             return 0;
@@ -88,7 +89,7 @@ impl<'a> Parser<'a> {
     }
 
     fn emit_byte<T: Into<u8>>(&mut self, byte: T) {
-        self.chunk.write_byte(byte, self.previous.line);
+        self.compiler.function.write_byte(byte, self.previous.line);
     }
 
     fn emit_bytes<T1: Into<u8>, T2: Into<u8>>(&mut self, byte1: T1, byte2: T2) {
@@ -109,26 +110,26 @@ impl<'a> Parser<'a> {
         self.emit_byte(instruction);
         self.emit_byte(0xff);
         self.emit_byte(0xff);
-        self.chunk.code.len() - 2
+        self.compiler.function.code_size() - 2
     }
 
     fn patch_jump(&mut self, offset: usize) {
-        let jump = self.chunk.code.len() - offset - 2;
+        let jump = self.compiler.function.code_size() - offset - 2;
         if jump > u16::MAX as usize {
             self.error("Too much code to jump over.");
         }
 
-        // self.chunk.code[offset] = ((jump >> 8) & 0xff) as u8;
-        // self.chunk.code[offset + 1] = (jump & 0xff) as u8;
+        // self.compiler.function[offset] = ((jump >> 8) & 0xff) as u8;
+        // self.compiler.function[offset + 1] = (jump & 0xff) as u8;
         let [a, b] = (jump as u16).to_be_bytes();
-        self.chunk.code[offset] = a;
-        self.chunk.code[offset + 1] = b;
+        self.compiler.function[offset] = a;
+        self.compiler.function[offset + 1] = b;
     }
 
     fn emit_loop(&mut self, loop_start: usize) {
         self.emit_byte(OpCode::Loop);
 
-        let jump = self.chunk.code.len() - loop_start + 2;
+        let jump = self.compiler.function.code_size() - loop_start + 2;
         if jump > u16::MAX as usize {
             self.error("Loop body too large.");
         }
@@ -282,7 +283,7 @@ impl<'a> Parser<'a> {
     }
 
     fn while_statement(&mut self) {
-        let loop_start = self.chunk.code.len();
+        let loop_start = self.compiler.function.code_size();
         self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after condition.");
@@ -307,7 +308,7 @@ impl<'a> Parser<'a> {
             self.expression_statement();
         }
 
-        let mut loop_start = self.chunk.code.len();
+        let mut loop_start = self.compiler.function.code_size();
         let mut exit_jump = None;
         if !self._match(TokenType::Semicolon) {
             self.expression();
@@ -320,7 +321,7 @@ impl<'a> Parser<'a> {
 
         if !self._match(TokenType::RightParen) {
             let body_jump = self.emit_jump(OpCode::Jump);
-            let increment_start = self.chunk.code.len();
+            let increment_start = self.compiler.function.code_size();
             self.expression();
             self.emit_byte(OpCode::Pop);
             self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
@@ -596,7 +597,7 @@ impl<'a> Parser<'a> {
 impl<'a> Compiler<'a> {
     pub fn new() -> Self {
         Compiler {
-            // parser: Parser::new(source),
+            function: Function::new("<script>", 0),
             locals: array::from_fn(|_| Local::default()),
             local_count: 0,
             scope_depth: 0,

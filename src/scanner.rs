@@ -69,10 +69,6 @@ impl<'a> Token<'a> {
     fn new(kind: TokenType, origin: &'a str, line: usize) -> Self {
         Token { kind, origin, line }
     }
-
-    pub fn is_error(&self) -> bool {
-        matches!(self.kind, TokenType::Error)
-    }
 }
 
 pub struct Scanner<'a> {

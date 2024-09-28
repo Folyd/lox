@@ -7,6 +7,7 @@ pub enum Value {
     Number(f64),
     Boolean(bool),
     String(Ustr),
+    Function,
     Nil,
 }
 
@@ -16,6 +17,7 @@ impl Display for Value {
             Value::Number(v) => write!(f, "{}", v),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
+            Value::Function => write!(f, "<fn >"),
             Value::Nil => write!(f, ""),
         }
     }
@@ -32,9 +34,9 @@ impl Value {
     pub fn as_boolean(&self) -> Result<bool, &'static str> {
         match self {
             Value::Boolean(value) => Ok(*value),
-            Value::Nil => Ok(false),
             Value::Number(value) => Ok(*value != 0.0),
             Value::String(s) => Ok(!s.is_empty()),
+            _ => Ok(false),
         }
     }
 
@@ -42,6 +44,17 @@ impl Value {
         match self {
             Value::String(value) => Ok(value),
             _ => Err("cannot convert to string"),
+        }
+    }
+
+    pub fn is_function(&self) -> bool {
+        matches!(self, Value::Function)
+    }
+
+    pub fn as_function(&self) -> Result<(), &'static str> {
+        match self {
+            Value::Function => Ok(()),
+            _ => Err("cannot convert to function"),
         }
     }
 

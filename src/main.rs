@@ -3,6 +3,7 @@ use std::{env::args, fs, process::exit};
 mod chunk;
 mod common;
 mod compiler;
+mod object;
 mod scanner;
 mod value;
 mod vm;

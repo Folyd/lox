@@ -1,4 +1,7 @@
-use std::sync::Once;
+use std::{
+    ops::{Index, IndexMut},
+    sync::Once,
+};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
@@ -36,14 +39,27 @@ pub enum OpCode {
 
 #[derive(Debug)]
 pub struct Chunk {
-    pub code: Vec<u8>,
-    pub constans: Vec<Value>,
-    pub lines: Vec<usize>,
+    code: Vec<u8>,
+    constans: Vec<Value>,
+    lines: Vec<usize>,
 }
 
 impl Default for Chunk {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Index<usize> for Chunk {
+    type Output = u8;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.code[index]
+    }
+}
+
+impl IndexMut<usize> for Chunk {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.code[index]
     }
 }
 
@@ -54,6 +70,10 @@ impl Chunk {
             constans: Vec::new(),
             lines: Vec::new(),
         }
+    }
+
+    pub fn code_size(&self) -> usize {
+        self.code.len()
     }
 
     pub fn write_code(&mut self, code: OpCode, line: usize) {

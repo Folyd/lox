@@ -31,13 +31,13 @@ impl Vm {
     }
 
     fn read_byte(&mut self) -> u8 {
-        let byte = self.chunk.code[self.ip];
+        let byte = self.chunk[self.ip];
         self.ip += 1;
         byte
     }
 
     fn read_short(&mut self) -> u16 {
-        let short = u16::from_be_bytes([self.chunk.code[self.ip], self.chunk.code[self.ip + 1]]);
+        let short = u16::from_be_bytes([self.chunk[self.ip], self.chunk[self.ip + 1]]);
         self.ip += 2;
         short
     }
@@ -50,6 +50,7 @@ impl Vm {
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let mut compiler = Compiler::new();
         self.chunk = compiler.compile(source);
+
         self.chunk.disassemble("main");
         self.run()
     }
