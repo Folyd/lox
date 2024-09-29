@@ -22,7 +22,7 @@ pub struct Vm {
     globals: UstrMap<Value>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CallFrame {
     pub function: Function,
     // When we return from a function, the VM will
@@ -31,6 +31,16 @@ pub struct CallFrame {
     // slot_start field points into the VM’s value stack
     // at the first slot that this function can use
     pub slot_start: usize,
+}
+
+impl std::fmt::Debug for CallFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CallFrame")
+            .field("function", &self.function.name)
+            .field("ip", &self.ip)
+            .field("slot_start", &self.slot_start)
+            .finish()
+    }
 }
 
 impl Default for CallFrame {
@@ -78,29 +88,33 @@ impl Vm {
     }
 
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
-        if let Ok(function) = compile(source) {
-            function.chunk.disassemble("script");
-            let code_size = function.chunk.code_size();
-            let call_frame = CallFrame {
-                function,
-                ip: 0,
-                slot_start: 0,
-            };
-            self.frames[self.frame_count] = call_frame;
-            self.frame_count += 1;
-            // self.chunk = function.chunk;
-            // self.chunk.disassemble("main");
-            self.run()
-        } else {
-            println!("Compile error");
-            InterpretResult::CompileError
+        match compile(source) {
+            Ok(function) => {
+                function.chunk.disassemble("script");
+                // let code_size = function.chunk.code_size();
+                let call_frame = CallFrame {
+                    function,
+                    ip: 0,
+                    slot_start: 0,
+                };
+                self.frames[self.frame_count] = call_frame;
+                self.frame_count += 1;
+                // self.chunk = function.chunk;
+                // self.chunk.disassemble("main");
+                // self.call(function, 0);
+                self.run()
+            }
+            Err(err) => {
+                println!("Compile error, {:?}", err);
+                InterpretResult::CompileError
+            }
         }
     }
 
     fn run(&mut self) -> InterpretResult {
         // FIXME: not sure clone is correct here
+        println!("run frames: {:?}", self.frames);
         let mut frame = self.frames[self.frame_count.saturating_sub(1)].clone();
-        // println!("run {:?}", frame);
         loop {
             // Debug stack info
             // self.print_stack();
@@ -234,6 +248,11 @@ impl Vm {
                     let offset = frame.read_short();
                     frame.ip -= offset as usize;
                 }
+                OpCode::Call => {
+                    let arg_count = frame.read_byte();
+                    self.call_value(self.peek(arg_count as usize).clone(), arg_count);
+                    // frame = self.frames[self.frame_count - 1].clone();
+                }
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }
         }
@@ -241,6 +260,31 @@ impl Vm {
 }
 
 impl Vm {
+    fn call_value(&mut self, callee: Value, arg_count: u8) {
+        match callee {
+            Value::Function(function) => self.call(function, arg_count),
+            _ => {
+                panic!("Can only call functions and classes");
+            }
+        }
+    }
+
+    fn call(&mut self, function: Box<Function>, arg_count: u8) {
+        if arg_count != function.arity {
+            panic!(
+                "Expected {} arguments but got {}",
+                function.arity, arg_count
+            );
+        }
+        let call_frame = CallFrame {
+            function: *function,
+            ip: 0,
+            slot_start: self.stack_top - arg_count as usize - 1,
+        };
+        self.frames[self.frame_count] = call_frame;
+        println!("current frames: {:?}", self.frames);
+    }
+
     fn push_stack(&mut self, value: Value) {
         if self.stack_top < STACK_MAX_SIZE {
             self.stack[self.stack_top] = value;

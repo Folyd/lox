@@ -6,7 +6,7 @@ use crate::{value::intern_str, Chunk};
 
 #[derive(Debug, Clone)]
 pub struct Function {
-    pub arity: u16,
+    pub arity: u8,
     pub chunk: Chunk,
     pub name: Ustr,
 }
@@ -24,7 +24,7 @@ impl Default for Function {
 }
 
 impl Function {
-    pub fn new(name: &str, arity: u16) -> Self {
+    pub fn new(name: &str, arity: u8) -> Self {
         Self {
             arity,
             chunk: Chunk::new(),

@@ -34,6 +34,7 @@ pub enum OpCode {
     JumpIfFalse,
     Jump,
     Loop,
+    Call,
     Unknown,
 }
 
@@ -146,6 +147,7 @@ impl Chunk {
                 OpCode::JumpIfFalse => return self.jump_instruction("JUMP_IF_FALSE", 1, offset),
                 OpCode::Jump => return self.jump_instruction("JUMP", 1, offset),
                 OpCode::Loop => return self.jump_instruction("LOOP", -1, offset),
+                OpCode::Call => return self.byte_instruction("CALL", offset),
                 OpCode::Unknown => {}
             }
         } else {

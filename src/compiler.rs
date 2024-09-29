@@ -368,7 +368,7 @@ impl<'a> Parser<'a> {
         self.begin_scope();
 
         self.consume(TokenType::LeftParen, "Expect '(' after function name.");
-        if !self._match(TokenType::RightParen) {
+        if !self.check(TokenType::RightParen) {
             loop {
                 self.compiler.function.arity += 1;
                 if self.compiler.function.arity > 255 {
@@ -598,6 +598,32 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn call(&mut self, _can_assign: bool) {
+        let arg_count = self.argument_list();
+        self.emit_bytes(OpCode::Call, arg_count);
+    }
+
+    fn argument_list(&mut self) -> u8 {
+        let mut arg_count = 0;
+        if !self.check(TokenType::RightParen) {
+            loop {
+                self.expression();
+
+                if arg_count == 255 {
+                    self.error("Can't have more than 255 arguments.");
+                    break;
+                }
+                arg_count += 1;
+
+                if !self._match(TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+        self.consume(TokenType::RightParen, "Expect ')' after arguments.");
+        arg_count
+    }
+
     fn variable(&mut self, can_assign: bool) {
         self.named_variable(self.previous.origin, can_assign);
     }
@@ -705,7 +731,9 @@ impl<'a> ParseRule<'a> {
 
     fn get_rule(kind: TokenType) -> Self {
         match kind {
-            TokenType::LeftParen => Self::new(Some(Parser::grouping), None, Precedence::None),
+            TokenType::LeftParen => {
+                Self::new(Some(Parser::grouping), Some(Parser::call), Precedence::Call)
+            }
             TokenType::RightParen => Self::new(None, None, Precedence::None),
             TokenType::LeftBrace => Self::new(None, None, Precedence::None),
             TokenType::RightBrace => Self::new(None, None, Precedence::None),
