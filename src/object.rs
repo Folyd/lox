@@ -1,36 +1,50 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::Chunk;
+use ustr::Ustr;
 
-pub struct Function<'a> {
-    pub arity: u8,
+use crate::{value::intern_str, Chunk};
+
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub arity: u16,
     pub chunk: Chunk,
-    pub name: &'a str,
+    pub name: Ustr,
 }
 
 pub enum FunctionType {
+    Function,
     Script,
     Native,
 }
 
-impl<'a> Function<'a> {
-    pub fn new(name: &'a str, arity: u8) -> Self {
-        Self {
-            arity,
-            chunk: Chunk::new(),
-            name,
-        }
+impl Default for Function {
+    fn default() -> Self {
+        Self::empty()
     }
 }
 
-impl Deref for Function<'_> {
+impl Function {
+    pub fn new(name: &str, arity: u16) -> Self {
+        Self {
+            arity,
+            chunk: Chunk::new(),
+            name: intern_str(name),
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self::new("", 0)
+    }
+}
+
+impl Deref for Function {
     type Target = Chunk;
     fn deref(&self) -> &Self::Target {
         &self.chunk
     }
 }
 
-impl DerefMut for Function<'_> {
+impl DerefMut for Function {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.chunk
     }

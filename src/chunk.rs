@@ -37,7 +37,7 @@ pub enum OpCode {
     Unknown,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Chunk {
     code: Vec<u8>,
     constans: Vec<Value>,
@@ -64,7 +64,7 @@ impl IndexMut<usize> for Chunk {
 }
 
 impl Chunk {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Chunk {
             code: Vec::new(),
             constans: Vec::new(),

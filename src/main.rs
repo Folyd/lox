@@ -62,5 +62,5 @@ fn test() {
     chunk.write_code(OpCode::Return, line);
 
     let mut vm = Vm::new();
-    vm.interpret_chunk(chunk);
+    // vm.interpret_chunk(chunk);
 }

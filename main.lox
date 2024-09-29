@@ -43,3 +43,10 @@ for (var i = 010; i > 0; i = i - 1) {
 }
 
 print "end";
+
+
+fun simple(a) {
+   print "simple";
+}
+
+print simple;

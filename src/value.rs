@@ -1,13 +1,15 @@
-use std::fmt::Display;
+use std::{borrow::Cow, fmt::Display};
 
 use ustr::Ustr;
 
-#[derive(Debug, Clone, PartialEq)]
+use crate::object::Function;
+
+#[derive(Debug, Clone)]
 pub enum Value {
     Number(f64),
     Boolean(bool),
     String(Ustr),
-    Function,
+    Function(Box<Function>),
     Nil,
 }
 
@@ -17,17 +19,27 @@ impl Display for Value {
             Value::Number(v) => write!(f, "{}", v),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
-            Value::Function => write!(f, "<fn >"),
+            Value::Function(fun) => write!(f, "<fn {}>", fun.name),
             Value::Nil => write!(f, ""),
         }
     }
 }
 
 impl Value {
-    pub fn as_number(self) -> Result<f64, &'static str> {
+    pub fn equals(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Number(a), Value::Number(b)) => a == b,
+            (Value::Boolean(a), Value::Boolean(b)) => a == b,
+            (Value::String(a), Value::String(b)) => a == b,
+            (Value::Nil, Value::Nil) => true,
+            _ => false,
+        }
+    }
+
+    pub fn as_number(self) -> Result<f64, Cow<'static, str>> {
         match self {
             Value::Number(value) => Ok(value),
-            _ => Err("cannot convert to number"),
+            a @ _ => Err(format!("cannot convert to number: {:?}", a).into()),
         }
     }
 
@@ -48,12 +60,12 @@ impl Value {
     }
 
     pub fn is_function(&self) -> bool {
-        matches!(self, Value::Function)
+        matches!(self, Value::Function(_))
     }
 
     pub fn as_function(&self) -> Result<(), &'static str> {
         match self {
-            Value::Function => Ok(()),
+            Value::Function(_) => Ok(()),
             _ => Err("cannot convert to function"),
         }
     }
@@ -108,6 +120,12 @@ impl From<&str> for Value {
     }
 }
 
-fn intern_str(s: &str) -> Ustr {
+impl From<Function> for Value {
+    fn from(value: Function) -> Self {
+        Value::Function(Box::new(value))
+    }
+}
+
+pub fn intern_str(s: &str) -> Ustr {
     Ustr::from_existing(s).unwrap_or_else(|| Ustr::from(s))
 }

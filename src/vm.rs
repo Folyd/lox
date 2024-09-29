@@ -2,9 +2,12 @@ use std::{array, borrow::Cow};
 
 use ustr::UstrMap;
 
-use crate::{compiler::Compiler, Chunk, OpCode, Value};
+use crate::{compiler::compile, object::Function, OpCode, Value};
 
-const STACK_MAX_SIZE: usize = 256;
+const FRAME_MAX_SIZE: usize = 64;
+const STACK_MAX_SIZE: usize = FRAME_MAX_SIZE * size_of::<u8>();
+
+#[derive(Debug)]
 pub enum InterpretResult {
     Ok,
     #[allow(unused)]
@@ -12,59 +15,101 @@ pub enum InterpretResult {
     RuntimeError(Cow<'static, str>),
 }
 pub struct Vm {
-    chunk: Chunk,
-    ip: usize,
+    frames: [CallFrame; FRAME_MAX_SIZE],
+    frame_count: usize,
     stack: [Value; STACK_MAX_SIZE],
     stack_top: usize,
     globals: UstrMap<Value>,
 }
 
+#[derive(Debug, Clone)]
+pub struct CallFrame {
+    pub function: Function,
+    // When we return from a function, the VM will
+    // jump to the ip of the caller’s CallFrame and resume from there.
+    pub ip: usize,
+    // slot_start field points into the VM’s value stack
+    // at the first slot that this function can use
+    pub slot_start: usize,
+}
+
+impl Default for CallFrame {
+    fn default() -> Self {
+        Self {
+            function: Function::empty(),
+            ip: 0,
+            slot_start: 0,
+        }
+    }
+}
+
+impl CallFrame {
+    fn read_byte(&mut self) -> u8 {
+        let byte = self.function[self.ip];
+        self.ip += 1;
+        byte
+    }
+
+    fn read_short(&mut self) -> u16 {
+        let short = u16::from_be_bytes([self.function[self.ip], self.function[self.ip + 1]]);
+        self.ip += 2;
+        short
+    }
+
+    fn read_constant(&mut self, byte: u8) -> Value {
+        self.function.read_constant(byte)
+    }
+
+    #[allow(unused)]
+    fn disassemble_instruction(&self, offset: usize) {
+        self.function.chunk.disassemble_instruction(offset);
+    }
+}
+
 impl Vm {
     pub fn new() -> Self {
         Vm {
-            chunk: Chunk::new(),
-            ip: 0,
+            frames: array::from_fn(|_| CallFrame::default()),
+            frame_count: 0,
             stack: array::from_fn(|_| Value::Nil),
             stack_top: 0,
             globals: UstrMap::default(),
         }
     }
 
-    fn read_byte(&mut self) -> u8 {
-        let byte = self.chunk[self.ip];
-        self.ip += 1;
-        byte
-    }
-
-    fn read_short(&mut self) -> u16 {
-        let short = u16::from_be_bytes([self.chunk[self.ip], self.chunk[self.ip + 1]]);
-        self.ip += 2;
-        short
-    }
-
-    pub fn interpret_chunk(&mut self, chunk: Chunk) -> InterpretResult {
-        self.chunk = chunk;
-        self.run()
-    }
-
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
-        let mut compiler = Compiler::new();
-        self.chunk = compiler.compile(source);
-
-        self.chunk.disassemble("main");
-        self.run()
+        if let Ok(function) = compile(source) {
+            function.chunk.disassemble("script");
+            let code_size = function.chunk.code_size();
+            let call_frame = CallFrame {
+                function,
+                ip: 0,
+                slot_start: 0,
+            };
+            self.frames[self.frame_count] = call_frame;
+            self.frame_count += 1;
+            // self.chunk = function.chunk;
+            // self.chunk.disassemble("main");
+            self.run()
+        } else {
+            println!("Compile error");
+            InterpretResult::CompileError
+        }
     }
 
     fn run(&mut self) -> InterpretResult {
+        // FIXME: not sure clone is correct here
+        let mut frame = self.frames[self.frame_count.saturating_sub(1)].clone();
+        // println!("run {:?}", frame);
         loop {
             // Debug stack info
             // self.print_stack();
             // // Disassemble instruction for debug
-            // self.chunk.disassemble_instruction(self.ip);
-            match OpCode::try_from(self.read_byte()).unwrap_or(OpCode::Unknown) {
+            // frame.disassemble_instruction(frame.ip);
+            match OpCode::try_from(frame.read_byte()).unwrap() {
                 OpCode::Constant => {
-                    let byte = self.read_byte();
-                    let constant = self.chunk.read_constant(byte);
+                    let byte = frame.read_byte();
+                    let constant = frame.read_constant(byte);
                     self.push_stack(constant);
                     // print_value(&constant);
                     // println!();
@@ -119,7 +164,7 @@ impl Vm {
                 OpCode::Equal => {
                     let b = self.pop_stack();
                     let a = self.pop_stack();
-                    self.push_stack((a == b).into());
+                    self.push_stack(a.equals(&b).into());
                 }
                 OpCode::Greater => {
                     let b = self.pop_stack().as_number().unwrap();
@@ -139,14 +184,14 @@ impl Vm {
                     self.pop_stack();
                 }
                 OpCode::DefineGlobal => {
-                    let byte = self.read_byte();
-                    let varible_name = self.chunk.read_constant(byte).as_string().unwrap();
+                    let byte = frame.read_byte();
+                    let varible_name = frame.read_constant(byte).as_string().unwrap();
                     self.globals.insert(varible_name, self.peek(0).clone());
                     self.pop_stack();
                 }
                 OpCode::GetGlobal => {
-                    let byte = self.read_byte();
-                    let varible_name = self.chunk.read_constant(byte).as_string().unwrap();
+                    let byte = frame.read_byte();
+                    let varible_name = frame.read_constant(byte).as_string().unwrap();
                     if let Some(value) = self.globals.get(&varible_name) {
                         self.push_stack(value.clone());
                     } else {
@@ -156,8 +201,8 @@ impl Vm {
                     }
                 }
                 OpCode::SetGlobal => {
-                    let byte = self.read_byte();
-                    let varible_name = self.chunk.read_constant(byte).as_string().unwrap();
+                    let byte = frame.read_byte();
+                    let varible_name = frame.read_constant(byte).as_string().unwrap();
                     #[allow(clippy::map_entry)]
                     if self.globals.contains_key(&varible_name) {
                         self.globals.insert(varible_name, self.peek(0).clone());
@@ -168,26 +213,26 @@ impl Vm {
                     }
                 }
                 OpCode::GetLocal => {
-                    let slot = self.read_byte();
-                    self.push_stack(self.stack[slot as usize].clone());
+                    let slot = frame.read_byte();
+                    self.push_stack(self.stack[frame.slot_start + slot as usize].clone());
                 }
                 OpCode::SetLocal => {
-                    let slot = self.read_byte();
-                    self.stack[slot as usize] = self.peek(0).clone();
+                    let slot = frame.read_byte();
+                    self.stack[frame.slot_start + slot as usize] = self.peek(0).clone();
                 }
                 OpCode::JumpIfFalse => {
-                    let offset = self.read_short();
+                    let offset = frame.read_short();
                     if self.peek(0).is_falsy() {
-                        self.ip += offset as usize;
+                        frame.ip += offset as usize;
                     }
                 }
                 OpCode::Jump => {
-                    let offset = self.read_short();
-                    self.ip += offset as usize;
+                    let offset = frame.read_short();
+                    frame.ip += offset as usize;
                 }
                 OpCode::Loop => {
-                    let offset = self.read_short();
-                    self.ip -= offset as usize;
+                    let offset = frame.read_short();
+                    frame.ip -= offset as usize;
                 }
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }
