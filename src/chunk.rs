@@ -109,7 +109,7 @@ impl Chunk {
         static ONCE_TITLE: Once = Once::new();
         ONCE_TITLE.call_once(|| {
             println!(
-                "{:4} {:4} {:16} {:04} Constvalue",
+                "{:4} {:4} {:16} {} Constvalue",
                 "IP", "Line", "OPCode", "CIndex"
             );
         });
@@ -158,21 +158,24 @@ impl Chunk {
     }
 
     fn constant_instruction(&self, name: &str, offset: usize) -> usize {
+        let name = format!("OP_{name}");
         let constant = self.code[offset + 1];
         println!(
-            "{:-16} {:04} {}",
+            "{:-16} {:4} '{}'",
             name, constant, self.constans[constant as usize]
         );
         offset + 2
     }
 
     fn byte_instruction(&self, name: &str, offset: usize) -> usize {
+        let name = format!("OP_{name}");
         let slot = self.code[offset + 1];
-        println!("{:-16} {:04}", name, slot);
+        println!("{:-16} {:4}", name, slot);
         offset + 2
     }
 
     fn jump_instruction(&self, name: &str, sign: i8, offset: usize) -> usize {
+        let name = format!("OP_{name}");
         let jump = u16::from_be_bytes([self.code[offset + 1], self.code[offset + 2]]);
         let jump = if sign < 0 {
             offset.saturating_add(3).saturating_sub(jump as usize)
@@ -180,12 +183,12 @@ impl Chunk {
             offset.saturating_add(3).saturating_add(jump as usize)
         };
 
-        println!("{:-16} {:04} -> {:04}", name, offset, jump);
+        println!("{:-16} {:4} -> {}", name, offset, jump);
         offset + 3
     }
 }
 
 fn simple_instruction(name: &str, offset: usize) -> usize {
-    println!("{name}");
+    println!("OP_{name}");
     offset + 1
 }

@@ -113,7 +113,7 @@ impl Vm {
 
     fn run(&mut self) -> InterpretResult {
         // FIXME: not sure clone is correct here
-        println!("run frames: {:?}", self.frames);
+        // println!("run frames: {:?}", self.frames);
         let mut frame = self.frames[self.frame_count.saturating_sub(1)].clone();
         loop {
             // Debug stack info
@@ -312,9 +312,9 @@ impl Vm {
     fn print_stack(&self) {
         print!("          ");
         for value in self.stack.iter().take(self.stack_top) {
-            print!("[");
+            print!("[ ");
             print!("{value}");
-            print!("]")
+            print!(" ]")
         }
         println!();
     }
