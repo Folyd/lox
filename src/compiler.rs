@@ -715,8 +715,24 @@ impl<'a> Compiler<'a> {
             enclosing: None,
             function: Function::new(name, 0),
             fn_type,
-            locals: array::from_fn(|_| Local::default()),
-            local_count: 0,
+            locals: array::from_fn(|i| {
+                // Remember that the compiler’s locals array keeps track of which stack slots
+                // are associated with which local variables or temporaries.
+                // From now on, the compiler implicitly claims stack slot zero for the VM’s own
+                //  internal use. We give it an empty name so that the user can’t write an
+                // identifier that refers to it.
+                if i == 0 {
+                    Local {
+                        name: Token::default(),
+                        depth: 0,
+                    }
+                } else {
+                    Local::default()
+                }
+            }),
+            // The initial value of the local_count starts at 1
+            // because we reserve slot zero for VM use.
+            local_count: 1,
             scope_depth: 0,
         })
     }

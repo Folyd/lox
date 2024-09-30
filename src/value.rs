@@ -20,7 +20,7 @@ impl Display for Value {
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
             Value::Function(fun) => write!(f, "<fn {}>", fun.name),
-            Value::Nil => write!(f, ""),
+            Value::Nil => write!(f, "nil"),
         }
     }
 }

@@ -241,6 +241,7 @@ impl Vm {
                 OpCode::JumpIfFalse => {
                     let is_falsy = self.peek(0).is_falsy();
                     let frame = self.current_frame();
+                    // Alwasy jump to the next instruction, do not move this line into if block
                     let offset = frame.read_short();
                     if is_falsy {
                         frame.ip += offset as usize;
@@ -290,7 +291,7 @@ impl Vm {
             ip: 0,
             slot_start: self.stack_top - arg_count as usize - 1,
         };
-        call_frame.disassemble();
+        // call_frame.disassemble();
         self.frames[self.frame_count] = call_frame;
         self.frame_count += 1;
         // println!("current frames: {:?}", self.frames);
