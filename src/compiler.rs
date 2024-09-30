@@ -73,11 +73,11 @@ pub struct Compiler<'a> {
 impl<'a> Parser<'a> {
     fn new(source: &'a str) -> Self {
         Parser {
-            compiler: Compiler::new(FunctionType::Script, "<script>"),
+            // Let the default top level <script> function name to empty.
+            compiler: Compiler::new(FunctionType::Script, ""),
             scanner: Scanner::new(source),
             current: Token::default(),
             previous: Token::default(),
-            // chunk: Chunk::new(),
             had_error: false,
             panic_mode: false,
         }

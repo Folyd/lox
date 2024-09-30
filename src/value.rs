@@ -19,7 +19,13 @@ impl Display for Value {
             Value::Number(v) => write!(f, "{}", v),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
-            Value::Function(fun) => write!(f, "<fn {}>", fun.name),
+            Value::Function(fun) => {
+                if fun.name.is_empty() {
+                    write!(f, "<script>")
+                } else {
+                    write!(f, "<fn {}>", fun.name)
+                }
+            }
             Value::Nil => write!(f, "nil"),
         }
     }
