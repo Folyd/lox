@@ -70,6 +70,10 @@ impl CallFrame {
         self.function.read_constant(byte)
     }
 
+    fn disassemble(&self) {
+        self.function.chunk.disassemble(&self.function.name);
+    }
+
     #[allow(unused)]
     fn disassemble_instruction(&self, offset: usize) {
         self.function.chunk.disassemble_instruction(offset);
@@ -281,6 +285,7 @@ impl Vm {
             ip: 0,
             slot_start: self.stack_top - arg_count as usize - 1,
         };
+        call_frame.disassemble();
         self.frames[self.frame_count] = call_frame;
         self.frame_count += 1;
         // println!("current frames: {:?}", self.frames);

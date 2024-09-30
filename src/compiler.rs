@@ -469,15 +469,11 @@ impl<'a> Parser<'a> {
         if self.had_error {
             return Err(InterpretResult::CompileError);
         }
-
-        self.emit_return();
-        // Some(self.end_compile())
         Ok(mem::take(&mut self.compiler.function))
     }
 
     // fn end_compile(&mut self) -> Option<Function> {
     //     self.emit_return();
-
     //     self.pop_compiler()
     // }
 
@@ -490,6 +486,7 @@ impl<'a> Parser<'a> {
     }
 
     fn pop_compiler(&mut self) -> Function {
+        self.emit_return();
         if let Some(enclosing_compiler) = self.compiler.enclosing.take() {
             let compiler = mem::replace(&mut self.compiler, enclosing_compiler);
             compiler.function
