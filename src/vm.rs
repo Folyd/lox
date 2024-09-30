@@ -14,6 +14,7 @@ pub enum InterpretResult {
     CompileError,
     RuntimeError(Cow<'static, str>),
 }
+
 pub struct Vm {
     frames: [CallFrame; FRAME_MAX_SIZE],
     frame_count: usize,
@@ -105,14 +106,16 @@ impl Vm {
         }
     }
 
+    fn current_frame(&mut self) -> &mut CallFrame {
+        &mut self.frames[self.frame_count - 1]
+    }
+
     fn run(&mut self) -> InterpretResult {
-        // FIXME: use arena to avoid clone?
-        let mut frame = self.frames[self.frame_count - 1].clone();
         loop {
             // Debug stack info
             self.print_stack();
-            // // Disassemble instruction for debug
-            // frame.disassemble_instruction();
+            let frame = self.current_frame();
+            // Disassemble instruction for debug
             frame.disassemble_instruction(frame.ip);
             match OpCode::try_from(frame.read_byte()).unwrap() {
                 OpCode::Constant => {
@@ -157,15 +160,15 @@ impl Vm {
                     self.push_stack((-v).into());
                 }
                 OpCode::Return => {
-                    let value = self.pop_stack();
+                    let frame_slot_start = frame.slot_start;
+                    let return_value = self.pop_stack();
                     self.frame_count -= 1;
                     if self.frame_count == 0 {
                         self.pop_stack();
                         return InterpretResult::Ok;
                     }
-                    self.stack_top = frame.slot_start;
-                    self.push_stack(value);
-                    frame = self.frames[self.frame_count - 1].clone();
+                    self.stack_top = frame_slot_start;
+                    self.push_stack(return_value);
                 }
                 OpCode::Nil => self.push_stack(Value::Nil),
                 OpCode::True => self.push_stack(Value::Boolean(true)),
@@ -227,15 +230,19 @@ impl Vm {
                 }
                 OpCode::GetLocal => {
                     let slot = frame.read_byte();
-                    self.push_stack(self.stack[frame.slot_start + slot as usize].clone());
+                    let value = self.stack[frame.slot_start + slot as usize].clone();
+                    self.push_stack(value);
                 }
                 OpCode::SetLocal => {
                     let slot = frame.read_byte();
-                    self.stack[frame.slot_start + slot as usize] = self.peek(0).clone();
+                    let slot_start = frame.slot_start;
+                    self.stack[slot_start + slot as usize] = self.peek(0).clone();
                 }
                 OpCode::JumpIfFalse => {
+                    let is_falsy = self.peek(0).is_falsy();
+                    let frame = self.current_frame();
                     let offset = frame.read_short();
-                    if self.peek(0).is_falsy() {
+                    if is_falsy {
                         frame.ip += offset as usize;
                     }
                 }
@@ -250,8 +257,6 @@ impl Vm {
                 OpCode::Call => {
                     let arg_count = frame.read_byte();
                     self.call_value(self.peek(arg_count as usize).clone(), arg_count);
-                    // FIXME: use arena to avoid clone?
-                    frame = self.frames[self.frame_count - 1].clone();
                 }
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }
