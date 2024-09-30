@@ -108,10 +108,7 @@ impl Chunk {
     pub fn disassemble_instruction(&self, offset: usize) -> usize {
         static ONCE_TITLE: Once = Once::new();
         ONCE_TITLE.call_once(|| {
-            println!(
-                "{:4} {:4} {:16} {} Constvalue",
-                "IP", "Line", "OPCode", "CIndex"
-            );
+            println!("{:4} {:4} {:16} CIndex Constvalue", "IP", "Line", "OPCode",);
         });
 
         print!("{:04} ", offset);

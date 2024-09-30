@@ -39,7 +39,7 @@ impl Value {
     pub fn as_number(self) -> Result<f64, Cow<'static, str>> {
         match self {
             Value::Number(value) => Ok(value),
-            a @ _ => Err(format!("cannot convert to number: {:?}", a).into()),
+            a => Err(format!("cannot convert to number: {:?}", a).into()),
         }
     }
 

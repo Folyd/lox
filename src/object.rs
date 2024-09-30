@@ -11,6 +11,7 @@ pub struct Function {
     pub name: Ustr,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum FunctionType {
     Function,
     Script,

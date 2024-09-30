@@ -5,7 +5,7 @@ use crate::{
     object::{Function, FunctionType},
     scanner::{Scanner, Token, TokenType},
     vm::InterpretResult,
-    Chunk, OpCode, Value,
+    OpCode, Value,
 };
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
@@ -102,6 +102,7 @@ impl<'a> Parser<'a> {
     }
 
     fn emit_return(&mut self) {
+        self.emit_byte(OpCode::Nil);
         self.emit_byte(OpCode::Return);
     }
 
@@ -268,12 +269,28 @@ impl<'a> Parser<'a> {
             self.end_scope();
         } else if self._match(TokenType::If) {
             self.if_statement();
+        } else if self._match(TokenType::Return) {
+            self.return_statement();
         } else if self._match(TokenType::While) {
             self.while_statement();
         } else if self._match(TokenType::For) {
             self.for_statement();
         } else {
             self.expression_statement();
+        }
+    }
+
+    fn return_statement(&mut self) {
+        if self.compiler.fn_type == FunctionType::Script {
+            self.error("Can't return from top-level code.");
+        }
+
+        if self._match(TokenType::Semicolon) {
+            self.emit_return();
+        } else {
+            self.expression();
+            self.consume(TokenType::Semicolon, "Expect ';' after return value.");
+            self.emit_byte(OpCode::Return);
         }
     }
 
@@ -371,9 +388,9 @@ impl<'a> Parser<'a> {
         if !self.check(TokenType::RightParen) {
             loop {
                 self.compiler.function.arity += 1;
-                if self.compiler.function.arity > 255 {
-                    self.error_at_current("Can't have more than 255 parameters.");
-                }
+                // if self.compiler.function.arity > 255 {
+                //     self.error_at_current("Can't have more than 255 parameters.");
+                // }
                 let constant = self.parse_variable("Expect parameter name.");
                 self.define_variable(constant);
 
@@ -467,7 +484,7 @@ impl<'a> Parser<'a> {
     fn push_compiler(&mut self, fn_type: FunctionType) {
         // grab the function name from the previous token
         let function_name = self.previous.origin;
-        let compiler = Compiler::new(fn_type, &function_name);
+        let compiler = Compiler::new(fn_type, function_name);
         let enclosing_compiler = mem::replace(&mut self.compiler, compiler);
         self.compiler.enclosing = Some(enclosing_compiler);
     }

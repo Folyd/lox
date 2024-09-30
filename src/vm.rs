@@ -90,18 +90,8 @@ impl Vm {
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         match compile(source) {
             Ok(function) => {
-                function.chunk.disassemble("script");
-                // let code_size = function.chunk.code_size();
-                let call_frame = CallFrame {
-                    function,
-                    ip: 0,
-                    slot_start: 0,
-                };
-                self.frames[self.frame_count] = call_frame;
-                self.frame_count += 1;
-                // self.chunk = function.chunk;
-                // self.chunk.disassemble("main");
-                // self.call(function, 0);
+                self.push_stack(Value::from(function.clone()));
+                self.call(function, 0);
                 self.run()
             }
             Err(err) => {
@@ -112,22 +102,19 @@ impl Vm {
     }
 
     fn run(&mut self) -> InterpretResult {
-        // FIXME: not sure clone is correct here
-        // println!("run frames: {:?}", self.frames);
-        let mut frame = self.frames[self.frame_count.saturating_sub(1)].clone();
+        // FIXME: use arena to avoid clone?
+        let mut frame = self.frames[self.frame_count - 1].clone();
         loop {
             // Debug stack info
-            // self.print_stack();
+            self.print_stack();
             // // Disassemble instruction for debug
-            // frame.disassemble_instruction(frame.ip);
+            // frame.disassemble_instruction();
+            frame.disassemble_instruction(frame.ip);
             match OpCode::try_from(frame.read_byte()).unwrap() {
                 OpCode::Constant => {
                     let byte = frame.read_byte();
                     let constant = frame.read_constant(byte);
                     self.push_stack(constant);
-                    // print_value(&constant);
-                    // println!();
-                    // break;
                 }
                 OpCode::Add => match (self.peek(0), self.peek(1)) {
                     (Value::Number(_), Value::Number(_)) => {
@@ -166,7 +153,15 @@ impl Vm {
                     self.push_stack((-v).into());
                 }
                 OpCode::Return => {
-                    return InterpretResult::Ok;
+                    let value = self.pop_stack();
+                    self.frame_count -= 1;
+                    if self.frame_count == 0 {
+                        self.pop_stack();
+                        return InterpretResult::Ok;
+                    }
+                    self.stack_top = frame.slot_start;
+                    self.push_stack(value);
+                    frame = self.frames[self.frame_count - 1].clone();
                 }
                 OpCode::Nil => self.push_stack(Value::Nil),
                 OpCode::True => self.push_stack(Value::Boolean(true)),
@@ -251,7 +246,8 @@ impl Vm {
                 OpCode::Call => {
                     let arg_count = frame.read_byte();
                     self.call_value(self.peek(arg_count as usize).clone(), arg_count);
-                    // frame = self.frames[self.frame_count - 1].clone();
+                    // FIXME: use arena to avoid clone?
+                    frame = self.frames[self.frame_count - 1].clone();
                 }
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }
@@ -262,27 +258,32 @@ impl Vm {
 impl Vm {
     fn call_value(&mut self, callee: Value, arg_count: u8) {
         match callee {
-            Value::Function(function) => self.call(function, arg_count),
+            Value::Function(function) => self.call(*function, arg_count),
             _ => {
                 panic!("Can only call functions and classes");
             }
         }
     }
 
-    fn call(&mut self, function: Box<Function>, arg_count: u8) {
+    fn call(&mut self, function: Function, arg_count: u8) {
         if arg_count != function.arity {
             panic!(
                 "Expected {} arguments but got {}",
                 function.arity, arg_count
             );
         }
+        if self.frame_count == FRAME_MAX_SIZE {
+            panic!("Too many active frames");
+        }
+
         let call_frame = CallFrame {
-            function: *function,
+            function,
             ip: 0,
             slot_start: self.stack_top - arg_count as usize - 1,
         };
         self.frames[self.frame_count] = call_frame;
-        println!("current frames: {:?}", self.frames);
+        self.frame_count += 1;
+        // println!("current frames: {:?}", self.frames);
     }
 
     fn push_stack(&mut self, value: Value) {
