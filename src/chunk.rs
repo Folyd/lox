@@ -163,8 +163,9 @@ impl Chunk {
                         let is_local = self.code[offset + i + 1] == 1;
                         let index = self.code[offset + i + 2];
                         println!(
-                            "{:04}     | {} {}",
+                            "{:04}    | {:-22} {:4} {}",
                             offset - 2,
+                            "",
                             if is_local { "local" } else { "upvalue" },
                             index,
                         );
