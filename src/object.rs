@@ -5,10 +5,16 @@ use ustr::Ustr;
 use crate::{value::intern_str, Chunk, Value};
 
 #[derive(Debug, Clone)]
+pub struct Closure {
+    pub function: Function,
+}
+
+#[derive(Debug, Clone)]
 pub struct Function {
     pub arity: u8,
     pub chunk: Chunk,
     pub name: Ustr,
+    pub upvalue_count: u8,
 }
 
 pub type NativeFn = fn(Vec<Value>) -> Value;
@@ -17,12 +23,18 @@ pub type NativeFn = fn(Vec<Value>) -> Value;
 pub enum FunctionType {
     Function,
     Script,
-    Native,
+    // Native,
 }
 
 impl Default for Function {
     fn default() -> Self {
         Self::empty()
+    }
+}
+
+impl Closure {
+    pub fn new(function: Function) -> Self {
+        Self { function }
     }
 }
 
@@ -32,6 +44,7 @@ impl Function {
             arity,
             chunk: Chunk::new(),
             name: intern_str(name),
+            upvalue_count: 0,
         }
     }
 

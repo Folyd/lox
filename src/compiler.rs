@@ -61,6 +61,14 @@ struct Local<'a> {
     depth: isize,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct Upvalue {
+    index: usize,
+    // that flag controls whether the closure captures a local
+    // variable or an upvalue from the surrounding function.
+    is_local: bool,
+}
+
 pub struct Compiler<'a> {
     enclosing: Option<Box<Compiler<'a>>>,
     function: Function,
@@ -68,6 +76,7 @@ pub struct Compiler<'a> {
     locals: [Local<'a>; MAX_LOCAL_SIZE],
     local_count: usize,
     scope_depth: isize,
+    upvalues: [Upvalue; MAX_LOCAL_SIZE],
 }
 
 impl<'a> Parser<'a> {
@@ -404,7 +413,19 @@ impl<'a> Parser<'a> {
         self.block();
 
         let function = self.pop_compiler();
-        self.emit_constant(Value::from(function));
+        // self.emit_constant(Value::from(function));
+        let constant = self.make_constant(Value::from(function));
+        self.emit_bytes(OpCode::Closure, constant as u8);
+
+        for i in 0..self.compiler.function.upvalue_count {
+            // For each upvalue the closure captures, there are two single-byte operands.
+            // Each pair of operands specifies what that upvalue captures.
+            // If the first byte is one, it captures a local variable in the enclosing function.
+            // If zero, it captures one of the function’s upvalues.
+            // The next byte is the local slot or upvalue index to capture.
+            let upvalue = self.compiler.upvalues[i as usize];
+            self.emit_bytes(upvalue.is_local as u8, upvalue.index as u8);
+        }
     }
 
     fn block(&mut self) {
@@ -643,18 +664,17 @@ impl<'a> Parser<'a> {
     }
 
     fn named_variable(&mut self, name: &str, can_assign: bool) {
-        let (pos, get_op, set_op) = match self.compiler.resolve_local(name) {
-            Some((pos, depth)) => {
-                if depth == UNINITIALIZED_LOCAL_DEPTH {
-                    self.error("Can't read local variable in its own initializer.");
-                    return;
-                }
-                (pos, OpCode::GetLocal, OpCode::SetLocal)
+        let (pos, get_op, set_op) = if let Some((pos, depth)) = self.compiler.resolve_local(name) {
+            if depth == UNINITIALIZED_LOCAL_DEPTH {
+                self.error("Can't read local variable in its own initializer.");
+                return;
             }
-            None => {
-                let pos = self.identifier_constant(name);
-                (pos, OpCode::GetGlobal, OpCode::SetGlobal)
-            }
+            (pos, OpCode::GetLocal, OpCode::SetLocal)
+        } else if let Some((pos, _)) = self.compiler.resolve_upvalue(name) {
+            (pos, OpCode::GetUpvalue, OpCode::SetUpvalue)
+        } else {
+            let pos = self.identifier_constant(name);
+            (pos, OpCode::GetGlobal, OpCode::SetGlobal)
         };
 
         if can_assign && self._match(TokenType::Equal) {
@@ -734,6 +754,7 @@ impl<'a> Compiler<'a> {
             // because we reserve slot zero for VM use.
             local_count: 1,
             scope_depth: 0,
+            upvalues: [Upvalue::default(); MAX_LOCAL_SIZE],
         })
     }
 
@@ -743,6 +764,49 @@ impl<'a> Compiler<'a> {
             .rev()
             .find(|&i| self.locals[i].name.origin == name)
             .map(|i| (i, self.locals[i].depth))
+    }
+
+    fn resolve_upvalue(&mut self, name: &str) -> Option<(usize, isize)> {
+        if let Some((index, depth)) = self
+            .enclosing
+            .as_mut()
+            .and_then(|enclosing| enclosing.resolve_local(name))
+        {
+            let index = self.add_upvalue(index, true);
+            return Some((index, depth));
+        } else if let Some((index, depth)) = self
+            .enclosing
+            .as_mut()
+            .and_then(|enclosing| enclosing.resolve_upvalue(name))
+        {
+            let index = self.add_upvalue(index, false);
+            return Some((index, depth));
+        }
+
+        None
+    }
+
+    fn add_upvalue(&mut self, index: usize, is_local: bool) -> usize {
+        let upvalue_index = self.function.upvalue_count as usize;
+
+        // before we add a new upvalue, we first check to see if the function
+        //  already has an upvalue that closes over that variable.
+        if let Some(i) = self
+            .upvalues
+            .iter()
+            .take(upvalue_index)
+            .position(|u| u.index == index && u.is_local == is_local)
+        {
+            return i;
+        }
+
+        if upvalue_index == MAX_LOCAL_SIZE {
+            panic!("Too many closure variables in function.");
+        }
+
+        self.upvalues[upvalue_index] = Upvalue { index, is_local };
+        self.function.upvalue_count += 1;
+        upvalue_index
     }
 }
 

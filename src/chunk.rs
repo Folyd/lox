@@ -35,6 +35,9 @@ pub enum OpCode {
     Jump,
     Loop,
     Call,
+    Closure,
+    GetUpvalue,
+    SetUpvalue,
     Unknown,
 }
 
@@ -103,7 +106,7 @@ impl Chunk {
         while offset < self.code.len() {
             offset = self.disassemble_instruction(offset);
         }
-        println!("<== {name} ==\n"); 
+        println!("<== {name} ==\n");
     }
 
     pub fn disassemble_instruction(&self, offset: usize) -> usize {
@@ -146,6 +149,30 @@ impl Chunk {
                 OpCode::Jump => return self.jump_instruction("JUMP", 1, offset),
                 OpCode::Loop => return self.jump_instruction("LOOP", -1, offset),
                 OpCode::Call => return self.byte_instruction("CALL", offset),
+                OpCode::Closure => {
+                    let mut offset = offset + 1;
+                    let constant = self.code[offset] as usize;
+                    offset += 1;
+                    println!(
+                        "{:-16} {:4} '{}'",
+                        "OP_CLOSURE", constant, self.constans[constant]
+                    );
+
+                    let function = self.constans[constant].clone().as_function().unwrap();
+                    (0..function.upvalue_count as usize).for_each(|i| {
+                        let is_local = self.code[offset + i + 1] == 1;
+                        let index = self.code[offset + i + 2];
+                        println!(
+                            "{:04}     | {} {}",
+                            offset - 2,
+                            if is_local { "local" } else { "upvalue" },
+                            index,
+                        );
+                    });
+                    return offset;
+                }
+                OpCode::GetUpvalue => return self.byte_instruction("GET_UPVALUE", offset),
+                OpCode::SetUpvalue => return self.byte_instruction("SET_UPVALUE", offset),
                 OpCode::Unknown => {}
             }
         } else {

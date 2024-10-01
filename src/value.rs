@@ -2,7 +2,7 @@ use std::{borrow::Cow, fmt::Display};
 
 use ustr::Ustr;
 
-use crate::object::{Function, NativeFn};
+use crate::object::{Closure, Function, NativeFn};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -10,6 +10,7 @@ pub enum Value {
     Boolean(bool),
     String(Ustr),
     Function(Box<Function>),
+    Closure(Box<Closure>),
     NativeFunction(NativeFn),
     Nil,
 }
@@ -25,6 +26,13 @@ impl Display for Value {
                     write!(f, "<script>")
                 } else {
                     write!(f, "<fn {}>", fun.name)
+                }
+            }
+            Value::Closure(closure) => {
+                if closure.function.name.is_empty() {
+                    write!(f, "<script>")
+                } else {
+                    write!(f, "<fn {}>", closure.function.name)
                 }
             }
             Value::NativeFunction(_) => write!(f, "<native fn>"),
@@ -67,15 +75,19 @@ impl Value {
         }
     }
 
+    pub fn as_function(self) -> Result<Function, &'static str> {
+        match self {
+            Value::Function(function) => Ok(*function),
+            _ => Err("cannot convert to function"),
+        }
+    }
+
     pub fn is_function(&self) -> bool {
         matches!(self, Value::Function(_))
     }
 
-    pub fn as_function(&self) -> Result<(), &'static str> {
-        match self {
-            Value::Function(_) => Ok(()),
-            _ => Err("cannot convert to function"),
-        }
+    pub fn is_closure(&self) -> bool {
+        matches!(self, Value::Closure(_))
     }
 
     pub fn is_nil(&self) -> bool {
@@ -137,6 +149,12 @@ impl From<&str> for Value {
 impl From<Function> for Value {
     fn from(value: Function) -> Self {
         Value::Function(Box::new(value))
+    }
+}
+
+impl From<Closure> for Value {
+    fn from(value: Closure) -> Self {
+        Value::Closure(Box::new(value))
     }
 }
 

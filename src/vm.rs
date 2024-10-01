@@ -5,7 +5,7 @@ use ustr::UstrMap;
 use crate::{
     builtins,
     compiler::compile,
-    object::{Function, NativeFn},
+    object::{Closure, Function, NativeFn},
     value::intern_str,
     OpCode, Value,
 };
@@ -31,7 +31,8 @@ pub struct Vm {
 
 #[derive(Clone)]
 pub struct CallFrame {
-    pub function: Function,
+    // pub function: Function,
+    pub closure: Closure,
     // When we return from a function, the VM will
     // jump to the ip of the caller’s CallFrame and resume from there.
     pub ip: usize,
@@ -43,7 +44,7 @@ pub struct CallFrame {
 impl std::fmt::Debug for CallFrame {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CallFrame")
-            .field("function", &self.function.name)
+            .field("function", &self.closure.function.name)
             .field("ip", &self.ip)
             .field("slot_start", &self.slot_start)
             .finish()
@@ -53,7 +54,10 @@ impl std::fmt::Debug for CallFrame {
 impl Default for CallFrame {
     fn default() -> Self {
         Self {
-            function: Function::empty(),
+            // function: Function::empty(),
+            closure: Closure {
+                function: Function::empty(),
+            },
             ip: 0,
             slot_start: 0,
         }
@@ -62,29 +66,35 @@ impl Default for CallFrame {
 
 impl CallFrame {
     fn read_byte(&mut self) -> u8 {
-        let byte = self.function[self.ip];
+        let byte = self.closure.function[self.ip];
         self.ip += 1;
         byte
     }
 
     fn read_short(&mut self) -> u16 {
-        let short = u16::from_be_bytes([self.function[self.ip], self.function[self.ip + 1]]);
+        let short = u16::from_be_bytes([
+            self.closure.function[self.ip],
+            self.closure.function[self.ip + 1],
+        ]);
         self.ip += 2;
         short
     }
 
     fn read_constant(&mut self, byte: u8) -> Value {
-        self.function.read_constant(byte)
+        self.closure.function.read_constant(byte)
     }
 
     #[allow(unused)]
     fn disassemble(&self) {
-        self.function.chunk.disassemble(&self.function.name);
+        self.closure
+            .function
+            .chunk
+            .disassemble(&self.closure.function.name);
     }
 
     #[allow(unused)]
     fn disassemble_instruction(&self, offset: usize) {
-        self.function.chunk.disassemble_instruction(offset);
+        self.closure.function.chunk.disassemble_instruction(offset);
     }
 }
 
@@ -106,8 +116,10 @@ impl Vm {
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         match compile(source) {
             Ok(function) => {
-                self.push_stack(Value::from(function.clone()));
-                self.call(function, 0);
+                function.disassemble("script");
+                let closure = Closure::new(function);
+                self.push_stack(Value::from(closure.clone()));
+                self.call(closure, 0);
                 self.run()
             }
             Err(err) => {
@@ -270,6 +282,14 @@ impl Vm {
                     let arg_count = frame.read_byte();
                     self.call_value(self.peek(arg_count as usize).clone(), arg_count);
                 }
+                OpCode::Closure => {
+                    let byte = frame.read_byte();
+                    let function = frame.read_constant(byte).as_function().unwrap();
+                    let closure = Closure::new(function);
+                    self.push_stack(Value::from(closure));
+                }
+                OpCode::GetUpvalue => {}
+                OpCode::SetUpvalue => {}
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }
         }
@@ -284,7 +304,8 @@ impl Vm {
 
     fn call_value(&mut self, callee: Value, arg_count: u8) {
         match callee {
-            Value::Function(function) => self.call(*function, arg_count),
+            Value::Function(_) => {} //self.call(*function, arg_count),
+            Value::Closure(closure) => self.call(*closure, arg_count),
             Value::NativeFunction(function) => {
                 let result = function(self.pop_stack_n(arg_count as usize));
                 self.push_stack(result);
@@ -295,11 +316,11 @@ impl Vm {
         }
     }
 
-    fn call(&mut self, function: Function, arg_count: u8) {
-        if arg_count != function.arity {
+    fn call(&mut self, closure: Closure, arg_count: u8) {
+        if arg_count != closure.function.arity {
             panic!(
                 "Expected {} arguments but got {}",
-                function.arity, arg_count
+                closure.function.arity, arg_count
             );
         }
         if self.frame_count == FRAME_MAX_SIZE {
@@ -307,7 +328,7 @@ impl Vm {
         }
 
         let call_frame = CallFrame {
-            function,
+            closure,
             ip: 0,
             slot_start: self.stack_top - arg_count as usize - 1,
         };
