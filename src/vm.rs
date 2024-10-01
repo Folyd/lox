@@ -11,7 +11,7 @@ use crate::{
 };
 
 const FRAME_MAX_SIZE: usize = 64;
-const STACK_MAX_SIZE: usize = FRAME_MAX_SIZE * size_of::<u8>();
+const STACK_MAX_SIZE: usize = FRAME_MAX_SIZE * (u8::MAX as usize + 1);
 
 #[derive(Debug)]
 pub enum InterpretResult {
