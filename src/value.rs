@@ -2,7 +2,7 @@ use std::{borrow::Cow, fmt::Display};
 
 use ustr::Ustr;
 
-use crate::object::Function;
+use crate::object::{Function, NativeFn};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -10,6 +10,7 @@ pub enum Value {
     Boolean(bool),
     String(Ustr),
     Function(Box<Function>),
+    NativeFunction(NativeFn),
     Nil,
 }
 
@@ -26,6 +27,7 @@ impl Display for Value {
                     write!(f, "<fn {}>", fun.name)
                 }
             }
+            Value::NativeFunction(_) => write!(f, "<native fn>"),
             Value::Nil => write!(f, "nil"),
         }
     }
@@ -94,6 +96,12 @@ impl Value {
 
     pub fn is_falsy(&self) -> bool {
         self.is_nil() || !self.as_boolean().unwrap_or(false)
+    }
+}
+
+impl From<u64> for Value {
+    fn from(value: u64) -> Self {
+        Value::Number(value as f64)
     }
 }
 

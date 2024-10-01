@@ -50,3 +50,23 @@ fun simple(a) {
 }
 
 print simple;
+
+fun simple(a) {
+   print "simple" + a;
+   f2();
+}
+
+fun f1() {
+    print "f1";
+}
+
+fun f2() {
+    print "f2";
+    f1();
+}
+
+print simple;
+
+simple("test");
+
+print clock();

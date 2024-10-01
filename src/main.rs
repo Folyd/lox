@@ -1,5 +1,6 @@
 use std::{env::args, fs, process::exit};
 
+mod builtins;
 mod chunk;
 mod common;
 mod compiler;
@@ -28,6 +29,7 @@ fn main() {
 fn run_file(path: &str) {
     let source = fs::read_to_string(path).unwrap();
     let mut vm = Vm::new();
+    vm.define_builtins();
     match vm.interpret(&source) {
         vm::InterpretResult::CompileError => exit(70),
         vm::InterpretResult::RuntimeError(err) => {

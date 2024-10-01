@@ -2,7 +2,13 @@ use std::{array, borrow::Cow};
 
 use ustr::UstrMap;
 
-use crate::{compiler::compile, object::Function, OpCode, Value};
+use crate::{
+    builtins,
+    compiler::compile,
+    object::{Function, NativeFn},
+    value::intern_str,
+    OpCode, Value,
+};
 
 const FRAME_MAX_SIZE: usize = 64;
 const STACK_MAX_SIZE: usize = FRAME_MAX_SIZE * size_of::<u8>();
@@ -71,6 +77,7 @@ impl CallFrame {
         self.function.read_constant(byte)
     }
 
+    #[allow(unused)]
     fn disassemble(&self) {
         self.function.chunk.disassemble(&self.function.name);
     }
@@ -90,6 +97,10 @@ impl Vm {
             stack_top: 0,
             globals: UstrMap::default(),
         }
+    }
+
+    pub fn define_builtins(&mut self) {
+        self.define_native_function("clock", builtins::clock);
     }
 
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
@@ -113,10 +124,10 @@ impl Vm {
     fn run(&mut self) -> InterpretResult {
         loop {
             // Debug stack info
-            self.print_stack();
+            // self.print_stack();
             let frame = self.current_frame();
             // Disassemble instruction for debug
-            frame.disassemble_instruction(frame.ip);
+            // frame.disassemble_instruction(frame.ip);
             match OpCode::try_from(frame.read_byte()).unwrap() {
                 OpCode::Constant => {
                     let byte = frame.read_byte();
@@ -266,9 +277,18 @@ impl Vm {
 }
 
 impl Vm {
+    fn define_native_function(&mut self, name: &str, function: NativeFn) {
+        self.globals
+            .insert(intern_str(name), Value::NativeFunction(function));
+    }
+
     fn call_value(&mut self, callee: Value, arg_count: u8) {
         match callee {
             Value::Function(function) => self.call(*function, arg_count),
+            Value::NativeFunction(function) => {
+                let result = function(self.pop_stack_n(arg_count as usize));
+                self.push_stack(result);
+            }
             _ => {
                 panic!("Can only call functions and classes");
             }
@@ -314,6 +334,27 @@ impl Vm {
             // panic!("Stack underflow")
             Value::Nil
         }
+    }
+
+    fn pop_stack_n(&mut self, n: usize) -> Vec<Value> {
+        if n == 0 {
+            return Vec::new();
+        }
+
+        // Ensure we don't pop more items than are on the stack
+        let n = n.min(self.stack_top);
+
+        let new_top = self.stack_top - n;
+        let mut result = Vec::with_capacity(n);
+
+        // Copy values from the stack to the result vector
+        result.extend_from_slice(&self.stack[new_top..self.stack_top]);
+
+        // Update the stack top
+        self.stack_top = new_top;
+
+        // No need to reverse as we're copying from bottom to top
+        result
     }
 
     fn peek(&self, distance: usize) -> &Value {

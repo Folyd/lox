@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use ustr::Ustr;
 
-use crate::{value::intern_str, Chunk};
+use crate::{value::intern_str, Chunk, Value};
 
 #[derive(Debug, Clone)]
 pub struct Function {
@@ -10,6 +10,8 @@ pub struct Function {
     pub chunk: Chunk,
     pub name: Ustr,
 }
+
+pub type NativeFn = fn(Vec<Value>) -> Value;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum FunctionType {
