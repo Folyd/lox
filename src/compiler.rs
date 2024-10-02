@@ -216,7 +216,7 @@ impl<'a> Parser<'a> {
             // Encounter a local variable
             return 0;
         }
-        self.identifier_constant(self.previous.origin)
+        self.identifier_constant(self.previous.lexeme)
     }
 
     fn identifier_constant(&mut self, identifier: &str) -> usize {
@@ -246,7 +246,7 @@ impl<'a> Parser<'a> {
             if local.depth != UNINITIALIZED_LOCAL_DEPTH && local.depth < self.compiler.scope_depth {
                 break;
             }
-            if local.name.origin == self.previous.origin {
+            if local.name.lexeme == self.previous.lexeme {
                 self.error("Already a variable with this name in this scope.");
             }
         }
@@ -500,7 +500,7 @@ impl<'a> Parser<'a> {
 
     fn push_compiler(&mut self, fn_type: FunctionType) {
         // grab the function name from the previous token
-        let function_name = self.previous.origin;
+        let function_name = self.previous.lexeme;
         let compiler = Compiler::new(fn_type, function_name);
         let enclosing_compiler = mem::replace(&mut self.compiler, compiler);
         self.compiler.enclosing = Some(enclosing_compiler);
@@ -538,7 +538,7 @@ impl<'a> Parser<'a> {
                 break;
             }
 
-            self.error_at_current(self.current.origin);
+            self.error_at_current(self.current.lexeme);
         }
     }
 
@@ -590,12 +590,12 @@ impl<'a> Parser<'a> {
     }
 
     fn string(&mut self, _can_assign: bool) {
-        let string = self.previous.origin.trim_matches('"');
+        let string = self.previous.lexeme.trim_matches('"');
         self.emit_constant(string.into());
     }
 
     fn number(&mut self, _can_assign: bool) {
-        self.emit_constant(self.previous.origin.parse::<f64>().unwrap().into());
+        self.emit_constant(self.previous.lexeme.parse::<f64>().unwrap().into());
     }
 
     fn grouping(&mut self, _can_assign: bool) {
@@ -660,7 +660,7 @@ impl<'a> Parser<'a> {
     }
 
     fn variable(&mut self, can_assign: bool) {
-        self.named_variable(self.previous.origin, can_assign);
+        self.named_variable(self.previous.lexeme, can_assign);
     }
 
     fn named_variable(&mut self, name: &str, can_assign: bool) {
@@ -722,7 +722,7 @@ impl<'a> Parser<'a> {
         } else if token.kind == TokenType::Error {
             // Do nothing.
         } else {
-            eprintln!(" at '{}'", token.origin);
+            eprintln!(" at '{}'", token.lexeme);
         }
         eprintln!("{message}");
         self.had_error = true;
@@ -762,7 +762,7 @@ impl<'a> Compiler<'a> {
     fn resolve_local(&mut self, name: &str) -> Option<(usize, isize)> {
         (0..self.local_count)
             .rev()
-            .find(|&i| self.locals[i].name.origin == name)
+            .find(|&i| self.locals[i].name.lexeme == name)
             .map(|i| (i, self.locals[i].depth))
     }
 

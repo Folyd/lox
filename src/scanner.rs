@@ -50,24 +50,28 @@ pub enum TokenType {
 
 #[derive(Debug, Clone)]
 pub struct Token<'a> {
+    pub lexeme: &'a str,
+    pub line: u32,
     pub kind: TokenType,
-    pub origin: &'a str,
-    pub line: usize,
 }
 
 impl Default for Token<'_> {
     fn default() -> Self {
         Self {
             kind: TokenType::Eof,
-            origin: "",
+            lexeme: "",
             line: 1,
         }
     }
 }
 
 impl<'a> Token<'a> {
-    fn new(kind: TokenType, origin: &'a str, line: usize) -> Self {
-        Token { kind, origin, line }
+    fn new(kind: TokenType, origin: &'a str, line: u32) -> Self {
+        Token {
+            kind,
+            lexeme: origin,
+            line,
+        }
     }
 }
 
@@ -76,7 +80,7 @@ pub struct Scanner<'a> {
     iter: Peekable<Chars<'a>>,
     pub start: usize,
     pub current: usize,
-    pub line: usize,
+    pub line: u32,
     is_eof: bool,
 }
 
@@ -131,7 +135,7 @@ impl<'a> Scanner<'a> {
     fn make_token(&self, kind: TokenType) -> Token<'a> {
         Token {
             kind,
-            origin: &self.source[self.start..self.current],
+            lexeme: &self.source[self.start..self.current],
             line: self.line,
         }
     }
