@@ -41,7 +41,7 @@ pub enum OpCode {
     Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Chunk {
     code: Vec<u8>,
     constans: Vec<Value>,
@@ -159,9 +159,11 @@ impl Chunk {
                     );
 
                     let function = self.constans[constant].clone().as_function().unwrap();
-                    (0..function.upvalue_count as usize).for_each(|i| {
-                        let is_local = self.code[offset + i + 1] == 1;
-                        let index = self.code[offset + i + 2];
+                    (0..function.upvalue_count as usize).for_each(|_| {
+                        let is_local = self.code[offset] == 1;
+                        offset += 1;
+                        let index = self.code[offset];
+                        offset += 1;
                         println!(
                             "{:04}    | {:-22} {:4} {}",
                             offset - 2,

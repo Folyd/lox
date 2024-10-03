@@ -412,18 +412,20 @@ impl<'a> Parser<'a> {
         self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
         self.block();
 
-        let function = self.pop_compiler();
-        // self.emit_constant(Value::from(function));
-        let constant = self.make_constant(Value::from(function));
+        // Pop the compiler of this compiling function,
+        // self.compiler already became set to enclosing compiler
+        let compiler = self.pop_compiler();
+        let upvalue_count = compiler.function.upvalue_count;
+        let constant = self.make_constant(Value::from(compiler.function));
         self.emit_bytes(OpCode::Closure, constant as u8);
 
-        for i in 0..self.compiler.function.upvalue_count {
+        for i in 0..upvalue_count {
             // For each upvalue the closure captures, there are two single-byte operands.
             // Each pair of operands specifies what that upvalue captures.
             // If the first byte is one, it captures a local variable in the enclosing function.
             // If zero, it captures one of the function’s upvalues.
             // The next byte is the local slot or upvalue index to capture.
-            let upvalue = self.compiler.upvalues[i as usize];
+            let upvalue = compiler.upvalues[i as usize];
             self.emit_bytes(upvalue.is_local as u8, upvalue.index as u8);
         }
     }
@@ -506,11 +508,10 @@ impl<'a> Parser<'a> {
         self.compiler.enclosing = Some(enclosing_compiler);
     }
 
-    fn pop_compiler(&mut self) -> Function {
+    fn pop_compiler(&mut self) -> Box<Compiler<'a>> {
         self.emit_return();
         if let Some(enclosing_compiler) = self.compiler.enclosing.take() {
-            let compiler = mem::replace(&mut self.compiler, enclosing_compiler);
-            compiler.function
+            mem::replace(&mut self.compiler, enclosing_compiler)
         } else {
             panic!("No enclosing compiler to pop");
         }
@@ -678,9 +679,11 @@ impl<'a> Parser<'a> {
         };
 
         if can_assign && self._match(TokenType::Equal) {
+            // println!("{name} {pos}, {:?}", set_op);
             self.expression();
             self.emit_bytes(set_op, pos as u8);
         } else {
+            // println!("{name} {pos}, {:?}", get_op);
             self.emit_bytes(get_op, pos as u8);
         }
     }
@@ -773,6 +776,10 @@ impl<'a> Compiler<'a> {
             .and_then(|enclosing| enclosing.resolve_local(name))
         {
             let index = self.add_upvalue(index, true);
+            // println!(
+            //     "resolve_upvalue: {} {name} {index}, local",
+            //     self.function.name
+            // );
             return Some((index, depth));
         } else if let Some((index, depth)) = self
             .enclosing
@@ -780,6 +787,10 @@ impl<'a> Compiler<'a> {
             .and_then(|enclosing| enclosing.resolve_upvalue(name))
         {
             let index = self.add_upvalue(index, false);
+            // println!(
+            //     "resolve_upvalue: {} {name} {index}, upvalue",
+            //     self.function.name
+            // );
             return Some((index, depth));
         }
 
@@ -806,6 +817,7 @@ impl<'a> Compiler<'a> {
 
         self.upvalues[upvalue_index] = Upvalue { index, is_local };
         self.function.upvalue_count += 1;
+        // println!("add upvalue to {upvalue_index} of {:?}", Upvalue { index, is_local });
         upvalue_index
     }
 }

@@ -1,11 +1,11 @@
-use std::{array, borrow::Cow};
+use std::{array, borrow::Cow, cell::RefCell, rc::Rc};
 
 use ustr::UstrMap;
 
 use crate::{
     builtins,
     compiler::compile,
-    object::{Closure, Function, NativeFn},
+    object::{Closure, NativeFn, UpvalueObj},
     value::intern_str,
     OpCode, Value,
 };
@@ -54,10 +54,7 @@ impl std::fmt::Debug for CallFrame {
 impl Default for CallFrame {
     fn default() -> Self {
         Self {
-            // function: Function::empty(),
-            closure: Closure {
-                function: Function::empty(),
-            },
+            closure: Closure::default(),
             ip: 0,
             slot_start: 0,
         }
@@ -116,7 +113,7 @@ impl Vm {
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         match compile(source) {
             Ok(function) => {
-                function.disassemble("script");
+                // function.disassemble("script");
                 let closure = Closure::new(function);
                 self.push_stack(Value::from(closure.clone()));
                 self.call(closure, 0);
@@ -136,7 +133,7 @@ impl Vm {
     fn run(&mut self) -> InterpretResult {
         loop {
             // Debug stack info
-            // self.print_stack();
+            self.print_stack();
             let frame = self.current_frame();
             // Disassemble instruction for debug
             // frame.disassemble_instruction(frame.ip);
@@ -283,13 +280,43 @@ impl Vm {
                     self.call_value(self.peek(arg_count as usize).clone(), arg_count);
                 }
                 OpCode::Closure => {
+                    // frame.disassemble();
                     let byte = frame.read_byte();
                     let function = frame.read_constant(byte).as_function().unwrap();
-                    let closure = Closure::new(function);
+                    // let fn_name = function.name;
+                    let mut closure = Closure::new(function);
+
+                    (0..closure.function.upvalue_count as usize).for_each(|i: usize| {
+                        let frame = self.current_frame();
+                        let is_local = frame.read_byte();
+                        let index = frame.read_byte() as usize;
+                        if is_local == 1 {
+                            let slot = frame.slot_start + index;
+                            let upvalue = self.capture_upvalue(slot);
+                            // println!("function {} capture local: {slot}, {:?}", fn_name, upvalue);
+                            closure.upvalues[i] = Rc::new(RefCell::new(upvalue));
+                        } else {
+                            // println!(
+                            //     "function {} capture upvalue: {index} {:?}",
+                            //     fn_name, &frame.closure.upvalues[index]
+                            // );
+                            closure.upvalues[i] = Rc::clone(&frame.closure.upvalues[index]);
+                        }
+                    });
+
                     self.push_stack(Value::from(closure));
                 }
-                OpCode::GetUpvalue => {}
-                OpCode::SetUpvalue => {}
+                OpCode::GetUpvalue => {
+                    let slot = frame.read_byte() as usize;
+                    let upvalue = (*frame.closure.upvalues[slot]).clone().into_inner();
+                    self.push_stack(upvalue.value);
+                }
+                OpCode::SetUpvalue => {
+                    let slot = frame.read_byte() as usize;
+                    let value = self.peek(slot).clone();
+                    let frame = self.current_frame();
+                    frame.closure.upvalues[slot].borrow_mut().value = value;
+                }
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }
         }
@@ -297,6 +324,13 @@ impl Vm {
 }
 
 impl Vm {
+    fn capture_upvalue(&mut self, slot: usize) -> UpvalueObj {
+        // Do not use peek() to get value!
+        // let value = self.peek(slot).clone();
+        let value = self.stack[slot].clone();
+        UpvalueObj::new(value)
+    }
+
     fn define_native_function(&mut self, name: &str, function: NativeFn) {
         self.globals
             .insert(intern_str(name), Value::NativeFunction(function));
@@ -332,10 +366,8 @@ impl Vm {
             ip: 0,
             slot_start: self.stack_top - arg_count as usize - 1,
         };
-        // call_frame.disassemble();
         self.frames[self.frame_count] = call_frame;
         self.frame_count += 1;
-        // println!("current frames: {:?}", self.frames);
     }
 
     fn push_stack(&mut self, value: Value) {

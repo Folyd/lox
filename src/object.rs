@@ -1,12 +1,39 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    cell::RefCell,
+    iter,
+    ops::{Deref, DerefMut},
+    rc::Rc,
+};
 
 use ustr::Ustr;
 
 use crate::{value::intern_str, Chunk, Value};
 
 #[derive(Debug, Clone)]
+pub struct UpvalueObj {
+    // pub location: usize,
+    pub value: Value,
+}
+
+impl Default for UpvalueObj {
+    fn default() -> Self {
+        Self { value: Value::Nil }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Closure {
     pub function: Function,
+    pub upvalues: Vec<Rc<RefCell<UpvalueObj>>>,
+}
+
+impl Default for Closure {
+    fn default() -> Self {
+        Self {
+            function: Function::empty(),
+            upvalues: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -32,9 +59,19 @@ impl Default for Function {
     }
 }
 
+impl UpvalueObj {
+    pub fn new(value: Value) -> Self {
+        Self { value }
+    }
+}
+
 impl Closure {
     pub fn new(function: Function) -> Self {
-        Self { function }
+        let upvalues = iter::repeat_with(UpvalueObj::default)
+            .take(function.upvalue_count as usize)
+            .map(|u| Rc::new(RefCell::new(u)))
+            .collect::<Vec<_>>();
+        Self { function, upvalues }
     }
 }
 
@@ -48,7 +85,7 @@ impl Function {
         }
     }
 
-    pub fn empty() -> Self {
+    fn empty() -> Self {
         Self::new("", 0)
     }
 }
