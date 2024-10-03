@@ -38,6 +38,7 @@ pub enum OpCode {
     Closure,
     GetUpvalue,
     SetUpvalue,
+    CloseUpvalue,
     Unknown,
 }
 
@@ -176,6 +177,7 @@ impl Chunk {
                 }
                 OpCode::GetUpvalue => return self.byte_instruction("GET_UPVALUE", offset),
                 OpCode::SetUpvalue => return self.byte_instruction("SET_UPVALUE", offset),
+                OpCode::CloseUpvalue => return simple_instruction("CLOSE_UPVALUE", offset),
                 OpCode::Unknown => {}
             }
         } else {

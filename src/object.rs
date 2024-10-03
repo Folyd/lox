@@ -13,11 +13,15 @@ use crate::{value::intern_str, Chunk, Value};
 pub struct UpvalueObj {
     // pub location: usize,
     pub value: Value,
+    pub next: Option<Rc<RefCell<UpvalueObj>>>,
 }
 
 impl Default for UpvalueObj {
     fn default() -> Self {
-        Self { value: Value::Nil }
+        Self {
+            value: Value::Nil,
+            next: None,
+        }
     }
 }
 
@@ -61,7 +65,7 @@ impl Default for Function {
 
 impl UpvalueObj {
     pub fn new(value: Value) -> Self {
-        Self { value }
+        Self { value, next: None }
     }
 }
 

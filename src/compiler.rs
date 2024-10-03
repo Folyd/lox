@@ -59,6 +59,9 @@ struct Local<'a> {
     name: Token<'a>,
     // -1 (UNINITIALIZED_LOCAL_DEPTH) means no assigned yet.
     depth: isize,
+    // This field is true if the local is captured by any later
+    // nested function declaration. Initially, all locals are not captured.
+    is_captured: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -232,6 +235,7 @@ impl<'a> Parser<'a> {
         self.compiler.locals[self.compiler.local_count] = Local {
             name,
             depth: UNINITIALIZED_LOCAL_DEPTH,
+            is_captured: false,
         };
         self.compiler.local_count += 1;
     }
@@ -448,9 +452,16 @@ impl<'a> Parser<'a> {
         while self.compiler.local_count > 0
             && self.compiler.locals[self.compiler.local_count - 1].depth > self.compiler.scope_depth
         {
-            // TODO: implement OP_POPN instruction that takes an operand
-            // for the number of slots to pop and pops them all at once.
-            self.emit_byte(OpCode::Pop);
+            if self.compiler.locals[self.compiler.local_count - 1].is_captured {
+                // Whenever the compiler reaches the end of a block, it discards all local 
+                // variables in that block and emits an OpCode::CloseUpvalue for each local variable
+                self.emit_byte(OpCode::CloseUpvalue);
+            } else {
+                // TODO: implement OP_POPN instruction that takes an operand
+                // for the number of slots to pop and pops them all at once.
+                self.emit_byte(OpCode::Pop);
+            }
+
             self.compiler.local_count -= 1;
         }
     }
@@ -748,6 +759,7 @@ impl<'a> Compiler<'a> {
                     Local {
                         name: Token::default(),
                         depth: 0,
+                        is_captured: false,
                     }
                 } else {
                     Local::default()
@@ -775,6 +787,11 @@ impl<'a> Compiler<'a> {
             .as_mut()
             .and_then(|enclosing| enclosing.resolve_local(name))
         {
+            if let Some(enclosing) = self.enclosing.as_mut() {
+                // When resolving an identifier, if we end up creating an upvalue for
+                // a local variable, we mark it as captured.
+                enclosing.locals[index].is_captured = true;
+            }
             let index = self.add_upvalue(index, true);
             // println!(
             //     "resolve_upvalue: {} {name} {index}, local",

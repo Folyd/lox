@@ -27,9 +27,10 @@ pub struct Vm {
     stack: [Value; STACK_MAX_SIZE],
     stack_top: usize,
     globals: UstrMap<Value>,
+    open_upvalues: Option<Rc<RefCell<UpvalueObj>>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct CallFrame {
     // pub function: Function,
     pub closure: Closure,
@@ -48,16 +49,6 @@ impl std::fmt::Debug for CallFrame {
             .field("ip", &self.ip)
             .field("slot_start", &self.slot_start)
             .finish()
-    }
-}
-
-impl Default for CallFrame {
-    fn default() -> Self {
-        Self {
-            closure: Closure::default(),
-            ip: 0,
-            slot_start: 0,
-        }
     }
 }
 
@@ -103,6 +94,7 @@ impl Vm {
             stack: array::from_fn(|_| Value::Nil),
             stack_top: 0,
             globals: UstrMap::default(),
+            open_upvalues: None,
         }
     }
 
@@ -136,7 +128,7 @@ impl Vm {
             self.print_stack();
             let frame = self.current_frame();
             // Disassemble instruction for debug
-            // frame.disassemble_instruction(frame.ip);
+            frame.disassemble_instruction(frame.ip);
             match OpCode::try_from(frame.read_byte()).unwrap() {
                 OpCode::Constant => {
                     let byte = frame.read_byte();
@@ -294,7 +286,7 @@ impl Vm {
                             let slot = frame.slot_start + index;
                             let upvalue = self.capture_upvalue(slot);
                             // println!("function {} capture local: {slot}, {:?}", fn_name, upvalue);
-                            closure.upvalues[i] = Rc::new(RefCell::new(upvalue));
+                            closure.upvalues[i] = upvalue;
                         } else {
                             // println!(
                             //     "function {} capture upvalue: {index} {:?}",
@@ -317,6 +309,7 @@ impl Vm {
                     let frame = self.current_frame();
                     frame.closure.upvalues[slot].borrow_mut().value = value;
                 }
+                OpCode::CloseUpvalue => {}
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }
         }
@@ -324,11 +317,33 @@ impl Vm {
 }
 
 impl Vm {
-    fn capture_upvalue(&mut self, slot: usize) -> UpvalueObj {
-        // Do not use peek() to get value!
-        // let value = self.peek(slot).clone();
-        let value = self.stack[slot].clone();
-        UpvalueObj::new(value)
+    fn capture_upvalue(&mut self, slot: usize) -> Rc<RefCell<UpvalueObj>> {
+        // Do not use peek() to get value! the slot would be incorrect offset to peek.
+        let local = &self.stack[slot];
+        let mut prev_upvalue = None;
+        let mut open_upvalue = self.open_upvalues.as_ref().map(Rc::clone);
+        while let Some(upvalue) = open_upvalue.as_ref().map(Rc::clone) {
+            if upvalue.borrow().value.equals(local) {
+                // We found an existing upvalue capturing the variable, 
+                // so we reuse that upvalue.
+                return Rc::clone(&upvalue);
+            }
+
+            prev_upvalue = Some(Rc::clone(&upvalue));
+            if let Some(next) = upvalue.borrow().next.as_ref().map(Rc::clone) {
+                open_upvalue = Some(next);
+            }
+        }
+
+        // create a new upvalue for our local slot and insert it into the list at the right location.
+        let created_upvalue = Rc::new(RefCell::new(UpvalueObj::new(local.clone())));
+        created_upvalue.borrow_mut().next = open_upvalue;
+        if let Some(prev) = prev_upvalue {
+            prev.borrow_mut().next = Some(Rc::clone(&created_upvalue));
+        } else {
+            self.open_upvalues = Some(Rc::clone(&created_upvalue));
+        }
+        created_upvalue
     }
 
     fn define_native_function(&mut self, name: &str, function: NativeFn) {
