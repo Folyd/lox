@@ -79,3 +79,20 @@ fun fib(n) {
 var start = clock();
 print fib(20);
 print clock() - start;
+
+fun outer() {
+  var a = 1;
+  var b = 2;
+  fun middle() {
+    var c = 3;
+    var d = 4;
+    fun inner() {
+      d = d + 1;
+      print a + c + b + d;
+    }
+    inner();
+    print d;
+  }
+  middle();
+}
+outer();

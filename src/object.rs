@@ -9,19 +9,28 @@ use ustr::Ustr;
 
 use crate::{value::intern_str, Chunk, Value};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct UpvalueObj {
-    // pub location: usize,
+    pub location: usize,
     pub value: Value,
+    pub closed: Option<Value>,
     pub next: Option<Rc<RefCell<UpvalueObj>>>,
+}
+
+impl std::fmt::Debug for UpvalueObj {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UpvalueObj")
+            .field("location", &self.location)
+            .field("value", &self.value)
+            .field("closed", &self.closed)
+            .field("next", &self.next.is_some())
+            .finish()
+    }
 }
 
 impl Default for UpvalueObj {
     fn default() -> Self {
-        Self {
-            value: Value::Nil,
-            next: None,
-        }
+        Self::new(0)
     }
 }
 
@@ -64,8 +73,13 @@ impl Default for Function {
 }
 
 impl UpvalueObj {
-    pub fn new(value: Value) -> Self {
-        Self { value, next: None }
+    pub fn new(location: usize) -> Self {
+        Self {
+            location,
+            value: Value::Nil,
+            closed: None,
+            next: None,
+        }
     }
 }
 

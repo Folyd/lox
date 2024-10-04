@@ -125,10 +125,10 @@ impl Vm {
     fn run(&mut self) -> InterpretResult {
         loop {
             // Debug stack info
-            self.print_stack();
+            // self.print_stack();
             let frame = self.current_frame();
             // Disassemble instruction for debug
-            frame.disassemble_instruction(frame.ip);
+            // frame.disassemble_instruction(frame.ip);
             match OpCode::try_from(frame.read_byte()).unwrap() {
                 OpCode::Constant => {
                     let byte = frame.read_byte();
@@ -174,6 +174,7 @@ impl Vm {
                 OpCode::Return => {
                     let frame_slot_start = frame.slot_start;
                     let return_value = self.pop_stack();
+                    self.close_upvalues(frame_slot_start);
                     self.frame_count -= 1;
                     if self.frame_count == 0 {
                         self.pop_stack();
@@ -301,15 +302,36 @@ impl Vm {
                 OpCode::GetUpvalue => {
                     let slot = frame.read_byte() as usize;
                     let upvalue = (*frame.closure.upvalues[slot]).clone().into_inner();
-                    self.push_stack(upvalue.value);
+                    if let Some(closed) = upvalue.closed.as_ref() {
+                        self.push_stack(closed.clone());
+                    } else {
+                        let location = frame.closure.upvalues[slot].borrow().location;
+                        let upvalue = self.stack[location].clone();
+                        self.push_stack(upvalue);
+                    }
                 }
                 OpCode::SetUpvalue => {
-                    let slot = frame.read_byte() as usize;
-                    let value = self.peek(slot).clone();
-                    let frame = self.current_frame();
-                    frame.closure.upvalues[slot].borrow_mut().value = value;
+                    // let frame = self.current_frame();
+                    let value = self.peek(0).clone();
+                    let location = {
+                        let frame = self.current_frame();
+                        let slot = frame.read_byte() as usize;
+                        // let value = self.peek(slot).clone();
+                        // let frame = self.current_frame();
+                        // frame.closure.upvalues[slot].borrow_mut().value = value;
+                        let mut upvalue = frame.closure.upvalues[slot].borrow_mut();
+                        let location = upvalue.location;
+                        upvalue.location = slot;
+                        upvalue.closed = Some(value.clone());
+                        location
+                    };
+                    // Also update the stack value
+                    self.stack[location] = value;
                 }
-                OpCode::CloseUpvalue => {}
+                OpCode::CloseUpvalue => {
+                    self.close_upvalues(self.stack_top - 1);
+                    self.pop_stack();
+                }
                 OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
             }
         }
@@ -318,25 +340,45 @@ impl Vm {
 
 impl Vm {
     fn capture_upvalue(&mut self, slot: usize) -> Rc<RefCell<UpvalueObj>> {
-        // Do not use peek() to get value! the slot would be incorrect offset to peek.
-        let local = &self.stack[slot];
         let mut prev_upvalue = None;
         let mut open_upvalue = self.open_upvalues.as_ref().map(Rc::clone);
-        while let Some(upvalue) = open_upvalue.as_ref().map(Rc::clone) {
-            if upvalue.borrow().value.equals(local) {
-                // We found an existing upvalue capturing the variable, 
-                // so we reuse that upvalue.
-                return Rc::clone(&upvalue);
-            }
-
-            prev_upvalue = Some(Rc::clone(&upvalue));
-            if let Some(next) = upvalue.borrow().next.as_ref().map(Rc::clone) {
-                open_upvalue = Some(next);
+        while open_upvalue.as_ref().map(|u| u.borrow().location > slot) == Some(true) {
+            if let Some(upvalue) = open_upvalue.as_ref().map(Rc::clone) {
+                prev_upvalue = Some(Rc::clone(&upvalue));
+                open_upvalue = upvalue.borrow().next.as_ref().map(Rc::clone);
+                //     open_upvalue = Some(next);
+                // } else {
+                //     break;
+                // }
             }
         }
+        if let Some(upvalue) = open_upvalue.as_ref() {
+            if upvalue.borrow().location == slot {
+                return Rc::clone(upvalue);
+            }
+        }
+        // while let Some(upvalue) = open_upvalue.as_ref().map(Rc::clone) {
+        //     // println!("capture upvalue: {:?}", upvalue);
 
+        //     // if upvalue.borrow().value.equals(local) {
+        //     if upvalue.borrow().location <= slot {
+        //         // We found an existing upvalue capturing the variable,
+        //         // so we reuse that upvalue.
+        //         return Rc::clone(&upvalue);
+        //     }
+
+        //     prev_upvalue = Some(Rc::clone(&upvalue));
+        //     if let Some(next) = upvalue.borrow().next.as_ref().map(Rc::clone) {
+        //         open_upvalue = Some(next);
+        //     } else {
+        //         break;
+        //     }
+        // }
+
+        // Do not use peek() to get value! the slot would be incorrect offset to peek.
+        // let local = &self.stack[slot].clone();
         // create a new upvalue for our local slot and insert it into the list at the right location.
-        let created_upvalue = Rc::new(RefCell::new(UpvalueObj::new(local.clone())));
+        let created_upvalue = Rc::new(RefCell::new(UpvalueObj::new(slot)));
         created_upvalue.borrow_mut().next = open_upvalue;
         if let Some(prev) = prev_upvalue {
             prev.borrow_mut().next = Some(Rc::clone(&created_upvalue));
@@ -344,6 +386,45 @@ impl Vm {
             self.open_upvalues = Some(Rc::clone(&created_upvalue));
         }
         created_upvalue
+    }
+
+    fn close_upvalues(&mut self, last: usize) {
+        // let mut open_upvalue = self.open_upvalues.as_ref().map(Rc::clone);
+        while let Some(upvalue) = self.open_upvalues.take() {
+            // .map(|u| u.borrow().location >= last) == Some(true) {
+            // let i = inner.borrow();
+            let mut upvalue = upvalue.borrow_mut();
+            // let location = upvalue.borrow().location;
+            // let next = i.next;
+            if upvalue.location < last {
+                break;
+                // *inner = inner.next.as_ref().map(Rc::clone);
+                // *inner = inner
+                //     .borrow()
+                //     .next
+                //     .as_ref()
+                //     .map(Rc::clone)
+                //     .unwrap_or_default();
+                // if let Some(n) = inner.borrow().next.as_ref() {
+                // *inner = (*n).clone().into_inner();
+                // }
+            }
+            // let upvalue = self.open_upvalues
+            let local = self.stack[upvalue.location].clone();
+            upvalue.closed = Some(local);
+            // Dummy location after closed assigned
+            // In C's version, the location is a pointer to upvalue.closed
+            // upvalue.location = 0;
+            self.open_upvalues = upvalue.next.clone();
+            // let _ = mem::replace(upvalue, n);
+            // if let Some(upvalue) = self.open_upvalue.as_ref().map(Rc::clone) {
+            //     open_upvalue = upvalue.borrow().next.as_ref().map(Rc::clone);
+            //     //     open_upvalue = Some(next);
+            //     // } else {
+            //     //     break;
+            //     // }
+            // }
+        }
     }
 
     fn define_native_function(&mut self, name: &str, function: NativeFn) {
