@@ -56,7 +56,7 @@ pub struct Vm {
     arena: Arena<Rootable![State<'_>]>,
 }
 
-#[derive(Clone, Collect)]
+#[derive(Debug, Clone, Collect)]
 #[collect(no_drop)]
 pub struct CallFrame<'gc> {
     // pub function: Function,
@@ -201,6 +201,8 @@ impl<'gc> State<'gc> {
                     let frame_slot_start = frame.slot_start;
                     let return_value = self.pop_stack();
                     self.close_upvalues(frame_slot_start);
+                    // Must pop the frame from vec when returning
+                    self.frames.pop();
                     self.frame_count -= 1;
                     if self.frame_count == 0 {
                         self.pop_stack();
@@ -337,7 +339,6 @@ impl<'gc> State<'gc> {
                     }
                 }
                 OpCode::SetUpvalue => {
-                    // let frame = self.current_frame();
                     let slot = frame.read_byte() as usize;
                     let mut upvalue = frame.closure.upvalues[slot].borrow_mut(mc);
                     let stack_position = upvalue.location;
@@ -425,6 +426,8 @@ impl<'gc> State<'gc> {
             Value::Closure(closure) => self.call(closure, arg_count),
             Value::NativeFunction(function) => {
                 let result = function(self.pop_stack_n(arg_count as usize));
+                // Stack should be restored after native function called
+                self.stack_top -= 1;
                 self.push_stack(result);
             }
             _ => {
@@ -434,6 +437,7 @@ impl<'gc> State<'gc> {
     }
 
     fn call(&mut self, closure: Gc<'gc, Closure<'gc>>, arg_count: u8) {
+        // closure.function.disassemble("fn");
         if arg_count != closure.function.arity {
             panic!(
                 "Expected {} arguments but got {}",
