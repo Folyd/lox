@@ -1,66 +1,60 @@
 use std::{
-    cell::RefCell,
     iter,
     ops::{Deref, DerefMut},
-    rc::Rc,
 };
 
-use ustr::Ustr;
+use gc_arena::{
+    lock::{GcRefLock, RefLock},
+    Collect, Gc, Mutation,
+};
 
-use crate::{value::intern_str, Chunk, Value};
+use crate::{Chunk, Value};
 
-#[derive(Clone, Debug)]
-pub struct UpvalueObj {
+#[derive(Debug, Copy, Clone, Collect)]
+#[collect[no_drop]]
+pub struct UpvalueObj<'gc> {
     pub location: usize,
-    pub closed: Option<Value>,
-    pub next: Option<Rc<RefCell<UpvalueObj>>>,
+    pub closed: Option<Value<'gc>>,
+    pub next: Option<GcRefLock<'gc, UpvalueObj<'gc>>>,
 }
 
-impl Default for UpvalueObj {
+impl<'gc> Default for UpvalueObj<'gc> {
     fn default() -> Self {
         Self::new(0)
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Closure {
-    pub function: Function,
-    pub upvalues: Vec<Rc<RefCell<UpvalueObj>>>,
+#[derive(Debug, Clone, Collect)]
+#[collect[no_drop]]
+pub struct Closure<'gc> {
+    pub function: Gc<'gc, Function<'gc>>,
+    pub upvalues: Box<[GcRefLock<'gc, UpvalueObj<'gc>>]>,
 }
 
-impl Default for Closure {
-    fn default() -> Self {
-        Self {
-            function: Function::empty(),
-            upvalues: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Function {
+#[derive(Debug, Clone, Collect)]
+#[collect[no_drop]]
+pub struct Function<'gc> {
     pub arity: u8,
-    pub chunk: Chunk,
-    pub name: Ustr,
+    pub chunk: Chunk<'gc>,
+    pub name: Gc<'gc, String>,
     pub upvalue_count: u8,
 }
 
-pub type NativeFn = fn(Vec<Value>) -> Value;
+pub type NativeFn<'gc> = fn(Vec<Value<'gc>>) -> Value<'gc>;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum FunctionType {
     Function,
     Script,
-    // Native,
 }
 
-impl Default for Function {
-    fn default() -> Self {
-        Self::empty()
-    }
-}
+// impl<'gc> Default for Function<'gc> {
+//     fn default() -> Self {
+//         Self::empty()
+//     }
+// }
 
-impl UpvalueObj {
+impl<'gc> UpvalueObj<'gc> {
     pub fn new(location: usize) -> Self {
         Self {
             location,
@@ -70,39 +64,39 @@ impl UpvalueObj {
     }
 }
 
-impl Closure {
-    pub fn new(function: Function) -> Self {
-        let upvalues = iter::repeat_with(UpvalueObj::default)
+impl<'gc> Closure<'gc> {
+    pub fn new(mc: &'gc Mutation<'gc>, function: Gc<'gc, Function<'gc>>) -> Self {
+        let upvalues = iter::repeat_with(|| Gc::new(mc, RefLock::new(UpvalueObj::default())))
             .take(function.upvalue_count as usize)
-            .map(|u| Rc::new(RefCell::new(u)))
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
         Self { function, upvalues }
     }
 }
 
-impl Function {
-    pub fn new(name: &str, arity: u8) -> Self {
+impl<'gc> Function<'gc> {
+    pub fn new(mc: &'gc Mutation<'gc>, name: &str, arity: u8) -> Self {
         Self {
             arity,
             chunk: Chunk::new(),
-            name: intern_str(name),
+            name: Gc::new(mc, name.to_owned()),
             upvalue_count: 0,
         }
     }
 
-    fn empty() -> Self {
-        Self::new("", 0)
-    }
+    // fn empty() -> Self {
+    //     Self::new("", 0)
+    // }
 }
 
-impl Deref for Function {
-    type Target = Chunk;
+impl<'gc> Deref for Function<'gc> {
+    type Target = Chunk<'gc>;
     fn deref(&self) -> &Self::Target {
         &self.chunk
     }
 }
 
-impl DerefMut for Function {
+impl<'gc> DerefMut for Function<'gc> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.chunk
     }

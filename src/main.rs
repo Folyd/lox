@@ -28,9 +28,9 @@ fn main() {
 
 fn run_file(path: &str) {
     let source = fs::read_to_string(path).unwrap();
+    let source: &'static str = Box::leak(source.into_boxed_str());
     let mut vm = Vm::new();
-    vm.define_builtins();
-    match vm.interpret(&source) {
+    match vm.interpret(source) {
         vm::InterpretResult::CompileError => exit(70),
         vm::InterpretResult::RuntimeError(err) => {
             println!("RuntimeError: {err}");
@@ -38,31 +38,4 @@ fn run_file(path: &str) {
         }
         _ => {}
     }
-}
-
-#[allow(unused)]
-fn test() {
-    let mut chunk = Chunk::new();
-    let line = 123;
-    let pos = chunk.add_constant(1.2.into());
-    chunk.write_code(OpCode::Constant, line);
-    chunk.write_byte(pos as u8, line);
-
-    let pos = chunk.add_constant(3.4.into());
-    chunk.write_code(OpCode::Constant, line);
-    chunk.write_byte(pos as u8, line);
-
-    chunk.write_code(OpCode::Add, line);
-
-    let pos = chunk.add_constant(5.6.into());
-    chunk.write_code(OpCode::Constant, 123);
-    chunk.write_byte(pos as u8, 123);
-
-    chunk.write_code(OpCode::Divide, line);
-
-    chunk.write_code(OpCode::Negate, line);
-    chunk.write_code(OpCode::Return, line);
-
-    let mut vm = Vm::new();
-    // vm.interpret_chunk(chunk);
 }

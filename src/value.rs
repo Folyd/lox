@@ -1,21 +1,41 @@
 use std::{borrow::Cow, fmt::Display};
 
+use gc_arena::{Collect, Gc};
 use ustr::Ustr;
 
 use crate::object::{Closure, Function, NativeFn};
 
-#[derive(Debug, Clone)]
-pub enum Value {
+#[derive(Debug, Copy, Clone)]
+pub enum Value<'gc> {
     Number(f64),
     Boolean(bool),
-    String(Ustr),
-    Function(Box<Function>),
-    Closure(Box<Closure>),
-    NativeFunction(NativeFn),
+    String(Gc<'gc, String>),
+    // String(Gc<'gc, Ustr>),
+    Function(Gc<'gc, Function<'gc>>),
+    Closure(Gc<'gc, Closure<'gc>>),
+    NativeFunction(NativeFn<'gc>),
     Nil,
 }
 
-impl Display for Value {
+unsafe impl<'gc> Collect for Value<'gc> {
+    fn needs_trace() -> bool
+    where
+        Self: Sized,
+    {
+        true
+    }
+
+    fn trace(&self, cc: &gc_arena::Collection) {
+        match self {
+            Value::String(s) => s.trace(cc),
+            Value::Function(fun) => fun.trace(cc),
+            Value::Closure(closure) => closure.trace(cc),
+            _ => {}
+        }
+    }
+}
+
+impl<'gc> Display for Value<'gc> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Number(v) => write!(f, "{}", v),
@@ -41,8 +61,8 @@ impl Display for Value {
     }
 }
 
-impl Value {
-    pub fn equals(&self, other: &Value) -> bool {
+impl<'gc> Value<'gc> {
+    pub fn equals(&self, other: &Value<'gc>) -> bool {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => a == b,
             (Value::Boolean(a), Value::Boolean(b)) => a == b,
@@ -68,16 +88,16 @@ impl Value {
         }
     }
 
-    pub fn as_string(self) -> Result<Ustr, &'static str> {
+    pub fn as_string(self) -> Result<Gc<'gc, String>, &'static str> {
         match self {
             Value::String(value) => Ok(value),
             _ => Err("cannot convert to string"),
         }
     }
 
-    pub fn as_function(self) -> Result<Function, &'static str> {
+    pub fn as_function(self) -> Result<Gc<'gc, Function<'gc>>, &'static str> {
         match self {
-            Value::Function(function) => Ok(*function),
+            Value::Function(function) => Ok(function),
             _ => Err("cannot convert to function"),
         }
     }
@@ -111,53 +131,55 @@ impl Value {
     }
 }
 
-impl From<u64> for Value {
+impl<'gc> From<u64> for Value<'gc> {
     fn from(value: u64) -> Self {
         Value::Number(value as f64)
     }
 }
 
-impl From<f64> for Value {
+impl<'gc> From<f64> for Value<'gc> {
     fn from(value: f64) -> Self {
         Value::Number(value)
     }
 }
 
-impl From<bool> for Value {
+impl<'gc> From<bool> for Value<'gc> {
     fn from(value: bool) -> Self {
         Value::Boolean(value)
     }
 }
 
-impl From<Ustr> for Value {
-    fn from(value: Ustr) -> Self {
+// impl<'gc> From<Gc<'gc, Ustr>> for Value<'gc> {
+//     fn from(value: Gc<'gc, Ustr>) -> Self {
+//         Value::String(value)
+//     }
+// }
+
+impl<'gc> From<Gc<'gc, String>> for Value<'gc> {
+    fn from(value: Gc<'gc, String>) -> Self {
         Value::String(value)
     }
 }
 
-impl From<String> for Value {
-    fn from(value: String) -> Self {
-        Value::String(intern_str(&value))
-    }
-}
-impl From<&str> for Value {
-    fn from(value: &str) -> Self {
-        Value::String(intern_str(value))
+// impl<'gc> From<&str> for Value<'gc> {
+//     fn from(value: &str) -> Self {
+//         Value::String(intern_str(value))
+//     }
+// }
+
+impl<'gc> From<Gc<'gc, Function<'gc>>> for Value<'gc> {
+    fn from(value: Gc<'gc, Function<'gc>>) -> Self {
+        Value::Function(value)
     }
 }
 
-impl From<Function> for Value {
-    fn from(value: Function) -> Self {
-        Value::Function(Box::new(value))
+impl<'gc> From<Gc<'gc, Closure<'gc>>> for Value<'gc> {
+    fn from(value: Gc<'gc, Closure<'gc>>) -> Self {
+        Value::Closure(value)
     }
 }
 
-impl From<Closure> for Value {
-    fn from(value: Closure) -> Self {
-        Value::Closure(Box::new(value))
-    }
-}
-
+#[allow(unused)]
 pub fn intern_str(s: &str) -> Ustr {
     Ustr::from_existing(s).unwrap_or_else(|| Ustr::from(s))
 }

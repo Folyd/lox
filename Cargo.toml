@@ -5,5 +5,6 @@ edition = "2021"
 publish = false
 
 [dependencies]
+gc-arena = { version = "0.5.3" }
 num_enum = "0.7.3"
 ustr = "1.0.0"

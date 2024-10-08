@@ -7,26 +7,27 @@ use crate::{
     vm::InterpretResult,
     OpCode, Value,
 };
+use gc_arena::{Gc, Mutation};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 const MAX_LOCAL_SIZE: usize = u8::MAX as usize + 1;
 const UNINITIALIZED_LOCAL_DEPTH: isize = -1;
 
-type ParseFn<'a> = fn(&mut Parser<'a>, bool /*can assign*/);
+type ParseFn<'gc> = fn(&mut Parser<'gc>, bool /*can assign*/);
 
-struct Parser<'a> {
-    compiler: Box<Compiler<'a>>,
-    scanner: Scanner<'a>,
-    current: Token<'a>,
-    previous: Token<'a>,
-    // chunk: Chunk,
+struct Parser<'gc> {
+    mutation: &'gc Mutation<'gc>,
+    compiler: Box<Compiler<'gc>>,
+    scanner: Scanner<'gc>,
+    current: Token<'gc>,
+    previous: Token<'gc>,
     had_error: bool,
     panic_mode: bool,
 }
 
-struct ParseRule<'a> {
-    prefix: Option<ParseFn<'a>>,
-    infix: Option<ParseFn<'a>>,
+struct ParseRule<'gc> {
+    prefix: Option<ParseFn<'gc>>,
+    infix: Option<ParseFn<'gc>>,
     precedence: Precedence,
 }
 
@@ -72,21 +73,22 @@ struct Upvalue {
     is_local: bool,
 }
 
-pub struct Compiler<'a> {
-    enclosing: Option<Box<Compiler<'a>>>,
-    function: Function,
+pub struct Compiler<'gc> {
+    enclosing: Option<Box<Compiler<'gc>>>,
+    function: Function<'gc>,
     fn_type: FunctionType,
-    locals: [Local<'a>; MAX_LOCAL_SIZE],
+    locals: [Local<'gc>; MAX_LOCAL_SIZE],
     local_count: usize,
     scope_depth: isize,
     upvalues: [Upvalue; MAX_LOCAL_SIZE],
 }
 
-impl<'a> Parser<'a> {
-    fn new(source: &'a str) -> Self {
+impl<'gc> Parser<'gc> {
+    fn new(mutation: &'gc Mutation<'gc>, source: &'gc str) -> Self {
         Parser {
             // Let the default top level <script> function name to empty.
-            compiler: Compiler::new(FunctionType::Script, ""),
+            mutation,
+            compiler: Compiler::new(mutation, FunctionType::Script, ""),
             scanner: Scanner::new(source),
             current: Token::default(),
             previous: Token::default(),
@@ -95,7 +97,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn make_constant(&mut self, value: Value) -> usize {
+    fn make_constant(&mut self, value: Value<'gc>) -> usize {
         let constant = self.compiler.function.add_constant(value);
         if constant > u8::MAX as usize {
             self.error("Too many constants in one chunk.");
@@ -118,7 +120,7 @@ impl<'a> Parser<'a> {
         self.emit_byte(OpCode::Return);
     }
 
-    fn emit_constant(&mut self, value: Value) {
+    fn emit_constant(&mut self, value: Value<'gc>) {
         let constant = self.make_constant(value);
         self.emit_bytes(OpCode::Constant, constant as u8);
     }
@@ -157,7 +159,7 @@ impl<'a> Parser<'a> {
     }
 }
 
-impl<'a> Parser<'a> {
+impl<'gc> Parser<'gc> {
     fn declaration(&mut self) {
         if self._match(TokenType::Fun) {
             self.fun_declaration();
@@ -223,10 +225,10 @@ impl<'a> Parser<'a> {
     }
 
     fn identifier_constant(&mut self, identifier: &str) -> usize {
-        self.make_constant(Value::from(identifier))
+        self.make_constant(Value::from(Gc::new(self.mutation, identifier.to_owned())))
     }
 
-    fn add_local(&mut self, name: Token<'a>) {
+    fn add_local(&mut self, name: Token<'gc>) {
         if self.compiler.local_count == MAX_LOCAL_SIZE {
             self.error("Too many local variables in function.");
             return;
@@ -420,7 +422,7 @@ impl<'a> Parser<'a> {
         // self.compiler already became set to enclosing compiler
         let compiler = self.pop_compiler();
         let upvalue_count = compiler.function.upvalue_count;
-        let constant = self.make_constant(Value::from(compiler.function));
+        let constant = self.make_constant(Value::from(Gc::new(self.mutation, compiler.function)));
         self.emit_bytes(OpCode::Closure, constant as u8);
 
         for i in 0..upvalue_count {
@@ -453,7 +455,7 @@ impl<'a> Parser<'a> {
             && self.compiler.locals[self.compiler.local_count - 1].depth > self.compiler.scope_depth
         {
             if self.compiler.locals[self.compiler.local_count - 1].is_captured {
-                // Whenever the compiler reaches the end of a block, it discards all local 
+                // Whenever the compiler reaches the end of a block, it discards all local
                 // variables in that block and emits an OpCode::CloseUpvalue for each local variable
                 self.emit_byte(OpCode::CloseUpvalue);
             } else {
@@ -493,8 +495,8 @@ impl<'a> Parser<'a> {
     }
 }
 
-impl<'a> Parser<'a> {
-    fn compile(&mut self) -> Result<Function, InterpretResult> {
+impl<'gc> Parser<'gc> {
+    fn compile(&mut self) -> Result<(), InterpretResult> {
         self.advance();
         while !self._match(TokenType::Eof) {
             self.declaration();
@@ -503,7 +505,8 @@ impl<'a> Parser<'a> {
         if self.had_error {
             return Err(InterpretResult::CompileError);
         }
-        Ok(mem::take(&mut self.compiler.function))
+        // Ok(self.compiler.function)
+        Ok(())
     }
 
     // fn end_compile(&mut self) -> Option<Function> {
@@ -514,12 +517,12 @@ impl<'a> Parser<'a> {
     fn push_compiler(&mut self, fn_type: FunctionType) {
         // grab the function name from the previous token
         let function_name = self.previous.lexeme;
-        let compiler = Compiler::new(fn_type, function_name);
+        let compiler = Compiler::new(self.mutation, fn_type, function_name);
         let enclosing_compiler = mem::replace(&mut self.compiler, compiler);
         self.compiler.enclosing = Some(enclosing_compiler);
     }
 
-    fn pop_compiler(&mut self) -> Box<Compiler<'a>> {
+    fn pop_compiler(&mut self) -> Box<Compiler<'gc>> {
         self.emit_return();
         if let Some(enclosing_compiler) = self.compiler.enclosing.take() {
             mem::replace(&mut self.compiler, enclosing_compiler)
@@ -603,7 +606,7 @@ impl<'a> Parser<'a> {
 
     fn string(&mut self, _can_assign: bool) {
         let string = self.previous.lexeme.trim_matches('"');
-        self.emit_constant(string.into());
+        self.emit_constant(Gc::new(self.mutation, string.to_owned()).into());
     }
 
     fn number(&mut self, _can_assign: bool) {
@@ -725,7 +728,7 @@ impl<'a> Parser<'a> {
         self.error_at(self.previous.clone(), message);
     }
 
-    fn error_at(&mut self, token: Token<'a>, message: &str) {
+    fn error_at(&mut self, token: Token<'gc>, message: &str) {
         if self.panic_mode {
             return;
         }
@@ -743,11 +746,11 @@ impl<'a> Parser<'a> {
     }
 }
 
-impl<'a> Compiler<'a> {
-    pub fn new(fn_type: FunctionType, name: &str) -> Box<Self> {
+impl<'gc> Compiler<'gc> {
+    pub fn new(mc: &'gc Mutation<'gc>, fn_type: FunctionType, name: &str) -> Box<Self> {
         Box::new(Compiler {
             enclosing: None,
-            function: Function::new(name, 0),
+            function: Function::new(mc, name, 0),
             fn_type,
             locals: array::from_fn(|i| {
                 // Remember that the compiler’s locals array keeps track of which stack slots
@@ -839,10 +842,10 @@ impl<'a> Compiler<'a> {
     }
 }
 
-impl<'a> ParseRule<'a> {
+impl<'gc> ParseRule<'gc> {
     fn new(
-        prefix: Option<ParseFn<'a>>,
-        infix: Option<ParseFn<'a>>,
+        prefix: Option<ParseFn<'gc>>,
+        infix: Option<ParseFn<'gc>>,
         precedence: Precedence,
     ) -> Self {
         ParseRule {
@@ -904,7 +907,11 @@ impl<'a> ParseRule<'a> {
     }
 }
 
-pub fn compile(source: &str) -> Result<Function, InterpretResult> {
-    let mut parser = Parser::new(source);
-    parser.compile()
+pub fn compile<'gc>(
+    mutation: &'gc Mutation<'gc>,
+    source: &'gc str,
+) -> Result<Function<'gc>, InterpretResult> {
+    let mut parser = Parser::new(mutation, source);
+    parser.compile()?;
+    Ok(parser.compiler.function)
 }

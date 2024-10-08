@@ -3,6 +3,7 @@ use std::{
     sync::Once,
 };
 
+use gc_arena::Collect;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::Value;
@@ -42,34 +43,35 @@ pub enum OpCode {
     Unknown,
 }
 
-#[derive(Clone, Debug)]
-pub struct Chunk {
+#[derive(Clone, Debug, Collect)]
+#[collect[no_drop]]
+pub struct Chunk<'gc> {
     code: Vec<u8>,
-    constans: Vec<Value>,
+    constans: Vec<Value<'gc>>,
     lines: Vec<u32>,
 }
 
-impl Default for Chunk {
+impl<'gc> Default for Chunk<'gc> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Index<usize> for Chunk {
+impl<'gc> Index<usize> for Chunk<'gc> {
     type Output = u8;
     fn index(&self, index: usize) -> &Self::Output {
         &self.code[index]
     }
 }
 
-impl IndexMut<usize> for Chunk {
+impl<'gc> IndexMut<usize> for Chunk<'gc> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.code[index]
     }
 }
 
-impl Chunk {
-    pub const fn new() -> Self {
+impl<'gc> Chunk<'gc> {
+    pub fn new() -> Self {
         Chunk {
             code: Vec::new(),
             constans: Vec::new(),
@@ -90,15 +92,15 @@ impl Chunk {
         self.lines.push(line);
     }
 
-    pub fn add_constant(&mut self, value: Value) -> usize {
+    pub fn add_constant(&mut self, value: Value<'gc>) -> usize {
         self.constans.push(value);
         // return the index where the constant
         // was appended so that we can locate that same constant later
         self.constans.len() - 1
     }
 
-    pub fn read_constant(&self, byte: u8) -> Value {
-        self.constans[byte as usize].clone()
+    pub fn read_constant(&self, byte: u8) -> Value<'gc> {
+        self.constans[byte as usize]
     }
 
     pub fn disassemble(&self, name: &str) {
@@ -159,7 +161,7 @@ impl Chunk {
                         "OP_CLOSURE", constant, self.constans[constant]
                     );
 
-                    let function = self.constans[constant].clone().as_function().unwrap();
+                    let function = self.constans[constant].as_function().unwrap();
                     (0..function.upvalue_count as usize).for_each(|_| {
                         let is_local = self.code[offset] == 1;
                         offset += 1;
