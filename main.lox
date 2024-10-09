@@ -97,7 +97,11 @@ fun outer() {
 }
 outer();
 
-class Pair {}
+class Pair {
+    test() {
+        print "test";
+    }
+}
 
 var pair = Pair();
 pair.first = 1;

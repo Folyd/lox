@@ -43,6 +43,7 @@ pub enum OpCode {
     Class,
     SetProperty,
     GetProperty,
+    Method,
     Unknown,
 }
 
@@ -186,6 +187,7 @@ impl<'gc> Chunk<'gc> {
                 OpCode::Class => return self.constant_instruction("CLASS", offset),
                 OpCode::SetProperty => return self.constant_instruction("SET_PROPERTY", offset),
                 OpCode::GetProperty => return self.constant_instruction("GET_PROPERTY", offset),
+                OpCode::Method => return self.constant_instruction("METHOD", offset),
                 OpCode::Unknown => {}
             }
         } else {

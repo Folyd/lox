@@ -392,14 +392,29 @@ impl<'gc> Parser<'gc> {
 
     fn class_declaration(&mut self) {
         self.consume(TokenType::Identifier, "Expect class name.");
-        let name_constant = self.identifier_constant(self.previous.lexeme);
+        let class_name = self.previous.lexeme;
+        let name_constant = self.identifier_constant(class_name);
         self.declare_varible();
 
         self.emit_bytes(OpCode::Class, name_constant as u8);
         self.define_variable(name_constant);
 
+        self.named_variable(class_name, false);
         self.consume(TokenType::LeftBrace, "Expect '{' before class body.");
+        while !self.check(TokenType::RightBrace) && !self.check(TokenType::Eof) {
+            self.method();
+        }
         self.consume(TokenType::RightBrace, "Expect '}' after class body.");
+        // Once we’ve reached the end of the methods, we no longer need
+        // the class and tell the VM to pop it off the stack.
+        self.emit_byte(OpCode::Pop);
+    }
+
+    fn method(&mut self) {
+        self.consume(TokenType::Identifier, "Expect method name.");
+        let name_constant = self.identifier_constant(self.previous.lexeme);
+        self.function(FunctionType::Function);
+        self.emit_bytes(OpCode::Method, name_constant as u8);
     }
 
     fn fun_declaration(&mut self) {

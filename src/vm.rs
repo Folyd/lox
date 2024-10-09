@@ -398,7 +398,10 @@ impl<'gc> State<'gc> {
                 }
                 OpCode::Class => {
                     let name = frame.read_string();
-                    self.push_stack(Value::from(Gc::new(self.mc, Class::new(name))));
+                    self.push_stack(Value::from(Gc::new(
+                        self.mc,
+                        RefLock::new(Class::new(name)),
+                    )));
                 }
                 OpCode::GetProperty => {
                     if let Ok(instance) = self.peek(0).as_instance() {
@@ -433,6 +436,10 @@ impl<'gc> State<'gc> {
                             "Only instances have fields.".into(),
                         ));
                     }
+                }
+                OpCode::Method => {
+                    let name = frame.read_string();
+                    self.define_method(name);
                 }
                 OpCode::Unknown => {
                     return Err(InterpretResult::RuntimeError("Unknown opcode".into()))
@@ -497,6 +504,16 @@ impl<'gc> State<'gc> {
             // upvalue.location = 0;
             self.open_upvalues = upvalue.next;
         }
+    }
+
+    fn define_method(&mut self, name: Gc<'gc, String>) {
+        let class = self.peek(1).as_class().unwrap();
+        class
+            .borrow_mut(self.mc)
+            .methods
+            .insert(name, *self.peek(0));
+        // pop the closure since we’re done with it.
+        self.pop_stack();
     }
 
     pub fn define_builtins(&mut self) {

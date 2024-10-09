@@ -14,7 +14,7 @@ pub enum Value<'gc> {
     Function(Gc<'gc, Function<'gc>>),
     Closure(Gc<'gc, Closure<'gc>>),
     NativeFunction(NativeFn<'gc>),
-    Class(Gc<'gc, Class<'gc>>),
+    Class(GcRefLock<'gc, Class<'gc>>),
     Instance(GcRefLock<'gc, Instance<'gc>>),
     Nil,
 }
@@ -58,8 +58,10 @@ impl<'gc> Display for Value<'gc> {
                 }
             }
             Value::NativeFunction(_) => write!(f, "<native fn>"),
-            Value::Class(class) => write!(f, "{}", class.name),
-            Value::Instance(instance) => write!(f, "{} instance", instance.borrow().class.name),
+            Value::Class(class) => write!(f, "{}", class.borrow().name),
+            Value::Instance(instance) => {
+                write!(f, "{} instance", instance.borrow().class.borrow().name)
+            }
             Value::Nil => write!(f, "nil"),
         }
     }
@@ -106,7 +108,7 @@ impl<'gc> Value<'gc> {
         }
     }
 
-    pub fn as_class(self) -> Result<Gc<'gc, Class<'gc>>, &'static str> {
+    pub fn as_class(self) -> Result<GcRefLock<'gc, Class<'gc>>, &'static str> {
         match self {
             Value::Class(class) => Ok(class),
             _ => Err("cannot convert to class"),
@@ -205,8 +207,8 @@ impl<'gc> From<Gc<'gc, Closure<'gc>>> for Value<'gc> {
     }
 }
 
-impl<'gc> From<Gc<'gc, Class<'gc>>> for Value<'gc> {
-    fn from(value: Gc<'gc, Class<'gc>>) -> Self {
+impl<'gc> From<GcRefLock<'gc, Class<'gc>>> for Value<'gc> {
+    fn from(value: GcRefLock<'gc, Class<'gc>>) -> Self {
         Value::Class(value)
     }
 }

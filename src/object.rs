@@ -53,23 +53,27 @@ pub enum FunctionType {
 #[collect(no_drop)]
 pub struct Class<'gc> {
     pub name: Gc<'gc, String>,
+    pub methods: HashMap<Gc<'gc, String>, Value<'gc>>,
 }
 
 #[derive(Debug, Collect)]
 #[collect(no_drop)]
 pub struct Instance<'gc> {
-    pub class: Gc<'gc, Class<'gc>>,
+    pub class: GcRefLock<'gc, Class<'gc>>,
     pub fields: HashMap<Gc<'gc, String>, Value<'gc>>,
 }
 
 impl<'gc> Class<'gc> {
     pub fn new(name: Gc<'gc, String>) -> Self {
-        Self { name }
+        Self {
+            name,
+            methods: HashMap::new(),
+        }
     }
 }
 
 impl<'gc> Instance<'gc> {
-    pub fn new(class: Gc<'gc, Class<'gc>>) -> Self {
+    pub fn new(class: GcRefLock<'gc, Class<'gc>>) -> Self {
         Self {
             class,
             fields: HashMap::new(),
@@ -106,10 +110,6 @@ impl<'gc> Function<'gc> {
             upvalue_count: 0,
         }
     }
-
-    // fn empty() -> Self {
-    //     Self::new("", 0)
-    // }
 }
 
 impl<'gc> Deref for Function<'gc> {
