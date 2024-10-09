@@ -413,7 +413,7 @@ impl<'gc> Parser<'gc> {
     fn method(&mut self) {
         self.consume(TokenType::Identifier, "Expect method name.");
         let name_constant = self.identifier_constant(self.previous.lexeme);
-        self.function(FunctionType::Function);
+        self.function(FunctionType::Method);
         self.emit_bytes(OpCode::Method, name_constant as u8);
     }
 
@@ -715,6 +715,12 @@ impl<'gc> Parser<'gc> {
         arg_count
     }
 
+    fn this(&mut self, _can_assign: bool) {
+        // we can’t assign to 'this', so we pass false to disallow
+        // look for a following = operator in the expression
+        self.variable(false);
+    }
+
     fn variable(&mut self, can_assign: bool) {
         self.named_variable(self.previous.lexeme, can_assign);
     }
@@ -800,8 +806,17 @@ impl<'gc> Compiler<'gc> {
                 //  internal use. We give it an empty name so that the user can’t write an
                 // identifier that refers to it.
                 if i == 0 {
+                    let name = if fn_type != FunctionType::Function {
+                        // Slot zero will store the instance in class methods.
+                        Token {
+                            lexeme: "this",
+                            ..Token::default()
+                        }
+                    } else {
+                        Token::default()
+                    };
                     Local {
-                        name: Token::default(),
+                        name,
                         depth: 0,
                         is_captured: false,
                     }
@@ -901,21 +916,15 @@ impl<'gc> ParseRule<'gc> {
             TokenType::LeftParen => {
                 Self::new(Some(Parser::grouping), Some(Parser::call), Precedence::Call)
             }
-            TokenType::RightParen => Self::new(None, None, Precedence::None),
-            TokenType::LeftBrace => Self::new(None, None, Precedence::None),
-            TokenType::RightBrace => Self::new(None, None, Precedence::None),
-            TokenType::Comma => Self::new(None, None, Precedence::None),
             TokenType::Dot => Self::new(None, Some(Parser::dot), Precedence::Call),
             TokenType::Minus => {
                 Self::new(Some(Parser::unary), Some(Parser::binary), Precedence::Term)
             }
             TokenType::Plus => Self::new(None, Some(Parser::binary), Precedence::Term),
-            TokenType::Semicolon => Self::new(None, None, Precedence::None),
             TokenType::Slash => Self::new(None, Some(Parser::binary), Precedence::Factor),
             TokenType::Star => Self::new(None, Some(Parser::binary), Precedence::Factor),
             TokenType::Bang => Self::new(Some(Parser::unary), None, Precedence::None),
             TokenType::BangEqual => Self::new(None, Some(Parser::binary), Precedence::Equality),
-            TokenType::Equal => Self::new(None, None, Precedence::None),
             TokenType::EqualEqual => Self::new(None, Some(Parser::binary), Precedence::Equality),
             TokenType::Greater => Self::new(None, Some(Parser::binary), Precedence::Comparison),
             TokenType::GreaterEqual => {
@@ -927,23 +936,12 @@ impl<'gc> ParseRule<'gc> {
             TokenType::String => Self::new(Some(Parser::string), None, Precedence::None),
             TokenType::Number => Self::new(Some(Parser::number), None, Precedence::None),
             TokenType::And => Self::new(None, Some(Parser::and), Precedence::And),
-            TokenType::Class => Self::new(None, None, Precedence::None),
-            TokenType::Else => Self::new(None, None, Precedence::None),
             TokenType::False => Self::new(Some(Parser::literal), None, Precedence::None),
-            TokenType::For => Self::new(None, None, Precedence::None),
-            TokenType::Fun => Self::new(None, None, Precedence::None),
-            TokenType::If => Self::new(None, None, Precedence::None),
             TokenType::Nil => Self::new(Some(Parser::literal), None, Precedence::None),
             TokenType::Or => Self::new(None, Some(Parser::or), Precedence::Or),
-            TokenType::Print => Self::new(None, None, Precedence::None),
-            TokenType::Return => Self::new(None, None, Precedence::None),
-            TokenType::Super => Self::new(None, None, Precedence::None),
-            TokenType::This => Self::new(None, None, Precedence::None),
+            TokenType::This => Self::new(Some(Parser::this), None, Precedence::None),
             TokenType::True => Self::new(Some(Parser::literal), None, Precedence::None),
-            TokenType::Var => Self::new(None, None, Precedence::None),
-            TokenType::While => Self::new(None, None, Precedence::None),
-            TokenType::Error => Self::new(None, None, Precedence::None),
-            TokenType::Eof => Self::new(None, None, Precedence::None),
+            _ => Self::new(None, None, Precedence::None),
         }
     }
 }

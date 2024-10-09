@@ -54,9 +54,10 @@ impl<'gc> Display for Function<'gc> {
 
 pub type NativeFn<'gc> = fn(Vec<Value<'gc>>) -> Value<'gc>;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FunctionType {
     Function,
+    Method,
     Script,
 }
 

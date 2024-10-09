@@ -543,8 +543,29 @@ impl<'gc> State<'gc> {
 
     fn call_value(&mut self, callee: Value<'gc>, arg_count: u8) {
         match callee {
-            Value::BoundMethod(bound_method) => {
-                return self.call(bound_method.method, arg_count);
+            Value::BoundMethod(bound) => {
+                // inserts the receiver into the new CallFrame's slot zero.
+                // normally, the receiver is 'this' keyword.
+                /* 
+                    Diagram for this: scone.topping("berries", "cream");
+
+                                                    stackTop
+                                                        |
+                        <---- -1 ---->                  |
+                                <------ argCount ---->  |
+                        0         1         2         3 v
+                        |         |         |         |
+                        v         v         v         v
+                    +----------+-----------+-----------+---
+                    | script   |fn topping()| "berries" | "cream"
+                    +----------+-----------+-----------+---
+                        ^                               ^
+                        |                               |
+                        +-------------------------------+
+                            topping Callframe
+                 */
+                self.stack[self.stack_top - arg_count as usize - 1] = bound.receiver;
+                return self.call(bound.method, arg_count);
             }
             Value::Class(class) => {
                 let instance = Instance::new(class);

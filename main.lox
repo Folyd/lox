@@ -118,3 +118,15 @@ var scone = Scone();
 scone.topping("berries", "cream");
 var tt = scone.topping;
 tt("berries2", "cream2");
+
+class Nested {
+  method() {
+    fun function() {
+      print this;
+    }
+
+    function();
+  }
+}
+
+Nested().method();
