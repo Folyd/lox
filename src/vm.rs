@@ -2,12 +2,13 @@ use std::{array, borrow::Cow, collections::HashMap};
 
 use gc_arena::{
     lock::{GcRefLock, RefLock},
-    Arena, Collect, Collection, Gc, Mutation, Rootable,
+    Arena, Collect, Collection, CollectionPhase, Gc, Mutation, Rootable,
 };
 
 use crate::{
     builtins,
     compiler::compile,
+    fuel::Fuel,
     object::{Closure, NativeFn, UpvalueObj},
     OpCode, Value,
 };
@@ -132,14 +133,44 @@ impl Vm {
                     let closure = Gc::new(mc, Closure::new(mc, Gc::new(mc, function)));
                     state.push_stack(Value::from(closure));
                     state.call(closure, 0);
-                    state.run(mc)
+                    InterpretResult::Ok
                 }
                 Err(err) => {
                     println!("Compile error, {:?}", err);
                     InterpretResult::CompileError
                 }
             };
-        })
+        });
+
+        loop {
+            const FUEL_PER_GC: i32 = 4096;
+            let mut fuel = Fuel::new(FUEL_PER_GC);
+            // periodically exit the arena in order to collect garbage concurrently with running the VM.
+            let result = self.arena.mutate_root(|_, state| state.step(&mut fuel));
+
+            const COLLECTOR_GRANULARITY: f64 = 1024.0;
+            if self.arena.metrics().allocation_debt() > COLLECTOR_GRANULARITY {
+                // Do garbage collection.
+                println!("Collecting...");
+                if self.arena.collection_phase() == CollectionPhase::Collecting {
+                    self.arena.collect_debt();
+                } else {
+                    // Immediately transition to `CollectionPhase::Collecting`.
+                    self.arena.mark_all().unwrap().start_collecting();
+                }
+            }
+
+            match result {
+                Ok(finished) => {
+                    if finished {
+                        break;
+                    }
+                }
+                Err(err) => return err,
+            }
+        }
+
+        InterpretResult::Ok
     }
 }
 
@@ -148,13 +179,17 @@ impl<'gc> State<'gc> {
         &mut self.frames[self.frame_count - 1]
     }
 
-    fn run(&mut self, mc: &'gc Mutation<'gc>) -> InterpretResult {
+    // Runs the VM for a period of time controlled by the `fuel` parameter.
+    //
+    // Returns `Ok(false)` if the method has exhausted its fuel, but there is more work to
+    // do, and returns `Ok(true)` if no more progress can be made.
+    fn step(&mut self, fuel: &mut Fuel) -> Result<bool, InterpretResult> {
         loop {
             // Debug stack info
-            self.print_stack();
+            // self.print_stack();
             let frame = self.current_frame();
             // Disassemble instruction for debug
-            frame.disassemble_instruction(frame.ip);
+            // frame.disassemble_instruction(frame.ip);
             match OpCode::try_from(frame.read_byte()).unwrap() {
                 OpCode::Constant => {
                     let byte = frame.read_byte();
@@ -170,12 +205,12 @@ impl<'gc> State<'gc> {
                     (Value::String(_), Value::String(_)) => {
                         let b = self.pop_stack().as_string().unwrap();
                         let a = self.pop_stack().as_string().unwrap();
-                        self.push_stack(Gc::new(mc, format!("{a}{b}")).into());
+                        self.push_stack(Gc::new(self.mc, format!("{a}{b}")).into());
                     }
                     _ => {
-                        return InterpretResult::RuntimeError(
+                        return Err(InterpretResult::RuntimeError(
                             "Operands must be two numbers or two strings.".into(),
-                        )
+                        ))
                     }
                 },
                 OpCode::Subtract => {
@@ -206,7 +241,7 @@ impl<'gc> State<'gc> {
                     self.frame_count -= 1;
                     if self.frame_count == 0 {
                         self.pop_stack();
-                        return InterpretResult::Ok;
+                        return Ok(true);
                     }
                     self.stack_top = frame_slot_start;
                     self.push_stack(return_value);
@@ -252,9 +287,9 @@ impl<'gc> State<'gc> {
                     if let Some(value) = self.globals.get(&varible_name) {
                         self.push_stack(*value);
                     } else {
-                        return InterpretResult::RuntimeError(
+                        return Err(InterpretResult::RuntimeError(
                             format!("Undefined variable '{}'", varible_name).into(),
-                        );
+                        ));
                     }
                 }
                 OpCode::SetGlobal => {
@@ -264,9 +299,9 @@ impl<'gc> State<'gc> {
                     if self.globals.contains_key(&varible_name) {
                         self.globals.insert(varible_name, *self.peek(0));
                     } else {
-                        return InterpretResult::RuntimeError(
+                        return Err(InterpretResult::RuntimeError(
                             format!("Undefined variable '{}'", varible_name).into(),
-                        );
+                        ));
                     }
                 }
                 OpCode::GetLocal => {
@@ -325,7 +360,7 @@ impl<'gc> State<'gc> {
                         }
                     });
 
-                    self.push_stack(Value::from(Gc::new(mc, closure)));
+                    self.push_stack(Value::from(Gc::new(self.mc, closure)));
                 }
                 OpCode::GetUpvalue => {
                     let slot = frame.read_byte() as usize;
@@ -340,7 +375,7 @@ impl<'gc> State<'gc> {
                 }
                 OpCode::SetUpvalue => {
                     let slot = frame.read_byte() as usize;
-                    let mut upvalue = frame.closure.upvalues[slot].borrow_mut(mc);
+                    let mut upvalue = frame.closure.upvalues[slot].borrow_mut(self.mc);
                     let stack_position = upvalue.location;
                     upvalue.location = slot;
 
@@ -353,7 +388,16 @@ impl<'gc> State<'gc> {
                     self.close_upvalues(self.stack_top - 1);
                     self.pop_stack();
                 }
-                OpCode::Unknown => return InterpretResult::RuntimeError("Unknown opcode".into()),
+                OpCode::Unknown => {
+                    return Err(InterpretResult::RuntimeError("Unknown opcode".into()))
+                }
+            }
+
+            const FUEL_PER_STEP: i32 = 4;
+            fuel.consume(FUEL_PER_STEP);
+
+            if !fuel.should_continue() {
+                return Ok(false);
             }
         }
     }

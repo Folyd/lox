@@ -4,6 +4,7 @@ mod builtins;
 mod chunk;
 mod common;
 mod compiler;
+mod fuel;
 mod object;
 mod scanner;
 mod value;
