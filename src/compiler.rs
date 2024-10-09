@@ -18,6 +18,7 @@ type ParseFn<'gc> = fn(&mut Parser<'gc>, bool /*can assign*/);
 struct Parser<'gc> {
     mutation: &'gc Mutation<'gc>,
     compiler: Box<Compiler<'gc>>,
+    class_compiler: Option<Box<ClassCompiler>>,
     scanner: Scanner<'gc>,
     current: Token<'gc>,
     previous: Token<'gc>,
@@ -83,12 +84,18 @@ pub struct Compiler<'gc> {
     upvalues: [Upvalue; MAX_LOCAL_SIZE],
 }
 
+#[derive(Default)]
+struct ClassCompiler {
+    enclosing: Option<Box<ClassCompiler>>,
+}
+
 impl<'gc> Parser<'gc> {
     fn new(mutation: &'gc Mutation<'gc>, source: &'gc str) -> Self {
         Parser {
             // Let the default top level <script> function name to empty.
             mutation,
             compiler: Compiler::new(mutation, FunctionType::Script, ""),
+            class_compiler: None,
             scanner: Scanner::new(source),
             current: Token::default(),
             previous: Token::default(),
@@ -399,6 +406,10 @@ impl<'gc> Parser<'gc> {
         self.emit_bytes(OpCode::Class, name_constant as u8);
         self.define_variable(name_constant);
 
+        let class_compiler = ClassCompiler {
+            enclosing: self.class_compiler.take(),
+        };
+        self.class_compiler = Some(Box::new(class_compiler));
         self.named_variable(class_name, false);
         self.consume(TokenType::LeftBrace, "Expect '{' before class body.");
         while !self.check(TokenType::RightBrace) && !self.check(TokenType::Eof) {
@@ -408,6 +419,8 @@ impl<'gc> Parser<'gc> {
         // Once we’ve reached the end of the methods, we no longer need
         // the class and tell the VM to pop it off the stack.
         self.emit_byte(OpCode::Pop);
+        // pop that compiler off the stack and restore the enclosing class compiler.
+        self.class_compiler = self.class_compiler.take().and_then(|c| c.enclosing);
     }
 
     fn method(&mut self) {
@@ -716,6 +729,10 @@ impl<'gc> Parser<'gc> {
     }
 
     fn this(&mut self, _can_assign: bool) {
+        if self.class_compiler.is_none() {
+            self.error("Can't use 'this' outside of a class.");
+            return;
+        }
         // we can’t assign to 'this', so we pass false to disallow
         // look for a following = operator in the expression
         self.variable(false);
