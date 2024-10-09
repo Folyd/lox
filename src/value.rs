@@ -3,7 +3,7 @@ use std::{borrow::Cow, fmt::Display};
 use gc_arena::{lock::GcRefLock, Collect, Gc};
 use ustr::Ustr;
 
-use crate::object::{Class, Closure, Function, Instance, NativeFn};
+use crate::object::{BoundMethod, Class, Closure, Function, Instance, NativeFn};
 
 #[derive(Debug, Copy, Clone)]
 pub enum Value<'gc> {
@@ -16,6 +16,7 @@ pub enum Value<'gc> {
     NativeFunction(NativeFn<'gc>),
     Class(GcRefLock<'gc, Class<'gc>>),
     Instance(GcRefLock<'gc, Instance<'gc>>),
+    BoundMethod(Gc<'gc, BoundMethod<'gc>>),
     Nil,
 }
 
@@ -43,13 +44,7 @@ impl<'gc> Display for Value<'gc> {
             Value::Number(v) => write!(f, "{}", v),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::String(s) => write!(f, "{}", s),
-            Value::Function(fun) => {
-                if fun.name.is_empty() {
-                    write!(f, "<script>")
-                } else {
-                    write!(f, "<fn {}>", fun.name)
-                }
-            }
+            Value::Function(fun) => write!(f, "{}", fun),
             Value::Closure(closure) => {
                 if closure.function.name.is_empty() {
                     write!(f, "<script>")
@@ -62,6 +57,7 @@ impl<'gc> Display for Value<'gc> {
             Value::Instance(instance) => {
                 write!(f, "{} instance", instance.borrow().class.borrow().name)
             }
+            Value::BoundMethod(bm) => write!(f, "{}", bm.method.function),
             Value::Nil => write!(f, "nil"),
         }
     }
@@ -101,6 +97,13 @@ impl<'gc> Value<'gc> {
         }
     }
 
+    pub fn as_closure(self) -> Result<Gc<'gc, Closure<'gc>>, &'static str> {
+        match self {
+            Value::Closure(closure) => Ok(closure),
+            _ => Err("cannot convert to closure"),
+        }
+    }
+
     pub fn as_function(self) -> Result<Gc<'gc, Function<'gc>>, &'static str> {
         match self {
             Value::Function(function) => Ok(function),
@@ -120,6 +123,17 @@ impl<'gc> Value<'gc> {
             Value::Instance(instance) => Ok(instance),
             _ => Err("cannot convert to instance"),
         }
+    }
+
+    pub fn as_bound_method(self) -> Result<Gc<'gc, BoundMethod<'gc>>, &'static str> {
+        match self {
+            Value::BoundMethod(bm) => Ok(bm),
+            _ => Err("cannot convert to bound method"),
+        }
+    }
+
+    pub fn is_bound_method(&self) -> bool {
+        matches!(self, Value::BoundMethod(_))
     }
 
     pub fn is_class(&self) -> bool {
@@ -216,6 +230,12 @@ impl<'gc> From<GcRefLock<'gc, Class<'gc>>> for Value<'gc> {
 impl<'gc> From<GcRefLock<'gc, Instance<'gc>>> for Value<'gc> {
     fn from(value: GcRefLock<'gc, Instance<'gc>>) -> Self {
         Value::Instance(value)
+    }
+}
+
+impl<'gc> From<Gc<'gc, BoundMethod<'gc>>> for Value<'gc> {
+    fn from(value: Gc<'gc, BoundMethod<'gc>>) -> Self {
+        Value::BoundMethod(value)
     }
 }
 

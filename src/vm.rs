@@ -1,3 +1,4 @@
+use core::panic;
 use std::{array, borrow::Cow, collections::HashMap};
 
 use gc_arena::{
@@ -9,7 +10,7 @@ use crate::{
     builtins,
     compiler::compile,
     fuel::Fuel,
-    object::{Class, Closure, Instance, NativeFn, UpvalueObj},
+    object::{BoundMethod, Class, Closure, Instance, NativeFn, UpvalueObj},
     OpCode, Value,
 };
 
@@ -410,7 +411,7 @@ impl<'gc> State<'gc> {
                         if let Some(property) = instance.borrow().fields.get(&name) {
                             self.pop_stack(); // Instance
                             self.push_stack(*property);
-                        } else {
+                        } else if !self.bind_method(instance.borrow().class, name) {
                             return Err(InterpretResult::RuntimeError(
                                 format!("Undefined property '{}'", name).into(),
                             ));
@@ -527,8 +528,24 @@ impl<'gc> State<'gc> {
         );
     }
 
+    fn bind_method(&mut self, class: GcRefLock<'gc, Class<'gc>>, name: Gc<'gc, String>) -> bool {
+        if let Some(method) = class.borrow().methods.get(&name) {
+            let bound = BoundMethod::new(*self.peek(0), (*method).as_closure().unwrap());
+            // pop the instance and replace the top of
+            // the stack with the bound method.
+            self.pop_stack();
+            self.push_stack(Value::from(Gc::new(self.mc, bound)));
+            true
+        } else {
+            panic!("Undefined property '{}'", name);
+        }
+    }
+
     fn call_value(&mut self, callee: Value<'gc>, arg_count: u8) {
         match callee {
+            Value::BoundMethod(bound_method) => {
+                return self.call(bound_method.method, arg_count);
+            }
             Value::Class(class) => {
                 let instance = Instance::new(class);
                 self.stack[self.stack_top - arg_count as usize - 1] =

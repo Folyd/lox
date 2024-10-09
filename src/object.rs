@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::{Display, Formatter},
     iter,
     ops::{Deref, DerefMut},
 };
@@ -41,6 +42,16 @@ pub struct Function<'gc> {
     pub upvalue_count: u8,
 }
 
+impl<'gc> Display for Function<'gc> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.name.is_empty() {
+            write!(f, "<script>")
+        } else {
+            write!(f, "<fn {}>", self.name)
+        }
+    }
+}
+
 pub type NativeFn<'gc> = fn(Vec<Value<'gc>>) -> Value<'gc>;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -63,6 +74,13 @@ pub struct Instance<'gc> {
     pub fields: HashMap<Gc<'gc, String>, Value<'gc>>,
 }
 
+#[derive(Debug, Collect)]
+#[collect(no_drop)]
+pub struct BoundMethod<'gc> {
+    pub receiver: Value<'gc>,
+    pub method: Gc<'gc, Closure<'gc>>,
+}
+
 impl<'gc> Class<'gc> {
     pub fn new(name: Gc<'gc, String>) -> Self {
         Self {
@@ -78,6 +96,12 @@ impl<'gc> Instance<'gc> {
             class,
             fields: HashMap::new(),
         }
+    }
+}
+
+impl<'gc> BoundMethod<'gc> {
+    pub fn new(receiver: Value<'gc>, method: Gc<'gc, Closure<'gc>>) -> Self {
+        Self { receiver, method }
     }
 }
 

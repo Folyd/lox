@@ -107,3 +107,14 @@ var pair = Pair();
 pair.first = 1;
 pair.second = 2;
 print pair.first + pair.second; // 3.
+
+class Scone {
+  topping(first, second) {
+    print "scone with " + first + " and " + second;
+  }
+}
+
+var scone = Scone();
+scone.topping("berries", "cream");
+var tt = scone.topping;
+tt("berries2", "cream2");
