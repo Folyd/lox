@@ -8,3 +8,7 @@ publish = false
 gc-arena = { version = "0.5.3" }
 num_enum = "0.7.3"
 ustr = "1.0.0"
+
+[features]
+# Enable debug features.
+debug = []

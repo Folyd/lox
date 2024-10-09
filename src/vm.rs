@@ -151,6 +151,7 @@ impl Vm {
             const COLLECTOR_GRANULARITY: f64 = 1024.0;
             if self.arena.metrics().allocation_debt() > COLLECTOR_GRANULARITY {
                 // Do garbage collection.
+                #[cfg(feature = "debug")]
                 println!("Collecting...");
                 if self.arena.collection_phase() == CollectionPhase::Collecting {
                     self.arena.collect_debt();
@@ -186,10 +187,12 @@ impl<'gc> State<'gc> {
     fn step(&mut self, fuel: &mut Fuel) -> Result<bool, InterpretResult> {
         loop {
             // Debug stack info
-            // self.print_stack();
+            #[cfg(feature = "debug")]
+            self.print_stack();
             let frame = self.current_frame();
             // Disassemble instruction for debug
-            // frame.disassemble_instruction(frame.ip);
+            #[cfg(feature = "debug")]
+            frame.disassemble_instruction(frame.ip);
             match OpCode::try_from(frame.read_byte()).unwrap() {
                 OpCode::Constant => {
                     let byte = frame.read_byte();
