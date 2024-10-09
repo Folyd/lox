@@ -1,9 +1,9 @@
 use std::{borrow::Cow, fmt::Display};
 
-use gc_arena::{Collect, Gc};
+use gc_arena::{lock::GcRefLock, Collect, Gc};
 use ustr::Ustr;
 
-use crate::object::{Closure, Function, NativeFn};
+use crate::object::{Class, Closure, Function, Instance, NativeFn};
 
 #[derive(Debug, Copy, Clone)]
 pub enum Value<'gc> {
@@ -14,6 +14,8 @@ pub enum Value<'gc> {
     Function(Gc<'gc, Function<'gc>>),
     Closure(Gc<'gc, Closure<'gc>>),
     NativeFunction(NativeFn<'gc>),
+    Class(Gc<'gc, Class<'gc>>),
+    Instance(GcRefLock<'gc, Instance<'gc>>),
     Nil,
 }
 
@@ -56,6 +58,8 @@ impl<'gc> Display for Value<'gc> {
                 }
             }
             Value::NativeFunction(_) => write!(f, "<native fn>"),
+            Value::Class(class) => write!(f, "{}", class.name),
+            Value::Instance(instance) => write!(f, "{} instance", instance.borrow().class.name),
             Value::Nil => write!(f, "nil"),
         }
     }
@@ -100,6 +104,28 @@ impl<'gc> Value<'gc> {
             Value::Function(function) => Ok(function),
             _ => Err("cannot convert to function"),
         }
+    }
+
+    pub fn as_class(self) -> Result<Gc<'gc, Class<'gc>>, &'static str> {
+        match self {
+            Value::Class(class) => Ok(class),
+            _ => Err("cannot convert to class"),
+        }
+    }
+
+    pub fn as_instance(self) -> Result<GcRefLock<'gc, Instance<'gc>>, &'static str> {
+        match self {
+            Value::Instance(instance) => Ok(instance),
+            _ => Err("cannot convert to instance"),
+        }
+    }
+
+    pub fn is_class(&self) -> bool {
+        matches!(self, Value::Class(_))
+    }
+
+    pub fn is_instance(&self) -> bool {
+        matches!(self, Value::Instance(_))
     }
 
     pub fn is_function(&self) -> bool {
@@ -176,6 +202,18 @@ impl<'gc> From<Gc<'gc, Function<'gc>>> for Value<'gc> {
 impl<'gc> From<Gc<'gc, Closure<'gc>>> for Value<'gc> {
     fn from(value: Gc<'gc, Closure<'gc>>) -> Self {
         Value::Closure(value)
+    }
+}
+
+impl<'gc> From<Gc<'gc, Class<'gc>>> for Value<'gc> {
+    fn from(value: Gc<'gc, Class<'gc>>) -> Self {
+        Value::Class(value)
+    }
+}
+
+impl<'gc> From<GcRefLock<'gc, Instance<'gc>>> for Value<'gc> {
+    fn from(value: GcRefLock<'gc, Instance<'gc>>) -> Self {
+        Value::Instance(value)
     }
 }
 

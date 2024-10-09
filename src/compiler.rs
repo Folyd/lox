@@ -161,7 +161,9 @@ impl<'gc> Parser<'gc> {
 
 impl<'gc> Parser<'gc> {
     fn declaration(&mut self) {
-        if self._match(TokenType::Fun) {
+        if self._match(TokenType::Class) {
+            self.class_declaration();
+        } else if self._match(TokenType::Fun) {
             self.fun_declaration();
         } else if self._match(TokenType::Var) {
             self.var_decaration();
@@ -388,6 +390,18 @@ impl<'gc> Parser<'gc> {
         self.end_scope();
     }
 
+    fn class_declaration(&mut self) {
+        self.consume(TokenType::Identifier, "Expect class name.");
+        let name_constant = self.identifier_constant(self.previous.lexeme);
+        self.declare_varible();
+
+        self.emit_bytes(OpCode::Class, name_constant as u8);
+        self.define_variable(name_constant);
+
+        self.consume(TokenType::LeftBrace, "Expect '{' before class body.");
+        self.consume(TokenType::RightBrace, "Expect '}' after class body.");
+    }
+
     fn fun_declaration(&mut self) {
         let global = self.parse_variable("Expect function name.");
         self.mark_initialized();
@@ -593,6 +607,18 @@ impl<'gc> Parser<'gc> {
             return;
         }
         self.error_at_current(message);
+    }
+
+    fn dot(&mut self, can_assign: bool) {
+        self.consume(TokenType::Identifier, "Expect property name after '.'.");
+        let name_constant = self.identifier_constant(self.previous.lexeme) as u8;
+
+        if can_assign && self._match(TokenType::Equal) {
+            self.expression();
+            self.emit_bytes(OpCode::SetProperty, name_constant);
+        } else {
+            self.emit_bytes(OpCode::GetProperty, name_constant);
+        }
     }
 
     fn literal(&mut self, _can_assign: bool) {
@@ -864,7 +890,7 @@ impl<'gc> ParseRule<'gc> {
             TokenType::LeftBrace => Self::new(None, None, Precedence::None),
             TokenType::RightBrace => Self::new(None, None, Precedence::None),
             TokenType::Comma => Self::new(None, None, Precedence::None),
-            TokenType::Dot => Self::new(None, None, Precedence::None),
+            TokenType::Dot => Self::new(None, Some(Parser::dot), Precedence::Call),
             TokenType::Minus => {
                 Self::new(Some(Parser::unary), Some(Parser::binary), Precedence::Term)
             }

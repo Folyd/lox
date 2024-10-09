@@ -40,6 +40,9 @@ pub enum OpCode {
     GetUpvalue,
     SetUpvalue,
     CloseUpvalue,
+    Class,
+    SetProperty,
+    GetProperty,
     Unknown,
 }
 
@@ -180,6 +183,9 @@ impl<'gc> Chunk<'gc> {
                 OpCode::GetUpvalue => return self.byte_instruction("GET_UPVALUE", offset),
                 OpCode::SetUpvalue => return self.byte_instruction("SET_UPVALUE", offset),
                 OpCode::CloseUpvalue => return simple_instruction("CLOSE_UPVALUE", offset),
+                OpCode::Class => return self.constant_instruction("CLASS", offset),
+                OpCode::SetProperty => return self.constant_instruction("SET_PROPERTY", offset),
+                OpCode::GetProperty => return self.constant_instruction("GET_PROPERTY", offset),
                 OpCode::Unknown => {}
             }
         } else {

@@ -9,7 +9,7 @@ use crate::{
     builtins,
     compiler::compile,
     fuel::Fuel,
-    object::{Closure, NativeFn, UpvalueObj},
+    object::{Class, Closure, Instance, NativeFn, UpvalueObj},
     OpCode, Value,
 };
 
@@ -88,6 +88,11 @@ impl<'gc> CallFrame<'gc> {
 
     fn read_constant(&mut self, byte: u8) -> Value<'gc> {
         self.closure.function.read_constant(byte)
+    }
+
+    fn read_string(&mut self) -> Gc<'gc, String> {
+        let byte = self.read_byte();
+        self.read_constant(byte).as_string().unwrap()
     }
 
     #[allow(unused)]
@@ -391,6 +396,44 @@ impl<'gc> State<'gc> {
                     self.close_upvalues(self.stack_top - 1);
                     self.pop_stack();
                 }
+                OpCode::Class => {
+                    let name = frame.read_string();
+                    self.push_stack(Value::from(Gc::new(self.mc, Class::new(name))));
+                }
+                OpCode::GetProperty => {
+                    if let Ok(instance) = self.peek(0).as_instance() {
+                        let frame = self.current_frame();
+                        let name = frame.read_string();
+                        if let Some(property) = instance.borrow().fields.get(&name) {
+                            self.pop_stack(); // Instance
+                            self.push_stack(*property);
+                        } else {
+                            return Err(InterpretResult::RuntimeError(
+                                format!("Undefined property '{}'", name).into(),
+                            ));
+                        }
+                    } else {
+                        return Err(InterpretResult::RuntimeError(
+                            "Only instances have properties.".into(),
+                        ));
+                    }
+                }
+                OpCode::SetProperty => {
+                    if let Ok(instantce) = self.peek(1).as_instance() {
+                        let value = *self.peek(0);
+                        let frame = self.current_frame();
+                        let name = frame.read_string();
+                        instantce.borrow_mut(self.mc).fields.insert(name, value);
+
+                        let value = self.pop_stack(); // Value
+                        self.pop_stack(); // Instance
+                        self.push_stack(value);
+                    } else {
+                        return Err(InterpretResult::RuntimeError(
+                            "Only instances have fields.".into(),
+                        ));
+                    }
+                }
                 OpCode::Unknown => {
                     return Err(InterpretResult::RuntimeError("Unknown opcode".into()))
                 }
@@ -469,6 +512,11 @@ impl<'gc> State<'gc> {
 
     fn call_value(&mut self, callee: Value<'gc>, arg_count: u8) {
         match callee {
+            Value::Class(class) => {
+                let instance = Instance::new(class);
+                self.stack[self.stack_top - arg_count as usize - 1] =
+                    Value::from(Gc::new(self.mc, RefLock::new(instance)));
+            }
             Value::Function(_) => {} //self.call(*function, arg_count),
             Value::Closure(closure) => self.call(closure, arg_count),
             Value::NativeFunction(function) => {

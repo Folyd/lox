@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     iter,
     ops::{Deref, DerefMut},
 };
@@ -48,11 +49,33 @@ pub enum FunctionType {
     Script,
 }
 
-// impl<'gc> Default for Function<'gc> {
-//     fn default() -> Self {
-//         Self::empty()
-//     }
-// }
+#[derive(Debug, Collect)]
+#[collect(no_drop)]
+pub struct Class<'gc> {
+    pub name: Gc<'gc, String>,
+}
+
+#[derive(Debug, Collect)]
+#[collect(no_drop)]
+pub struct Instance<'gc> {
+    pub class: Gc<'gc, Class<'gc>>,
+    pub fields: HashMap<Gc<'gc, String>, Value<'gc>>,
+}
+
+impl<'gc> Class<'gc> {
+    pub fn new(name: Gc<'gc, String>) -> Self {
+        Self { name }
+    }
+}
+
+impl<'gc> Instance<'gc> {
+    pub fn new(class: Gc<'gc, Class<'gc>>) -> Self {
+        Self {
+            class,
+            fields: HashMap::new(),
+        }
+    }
+}
 
 impl<'gc> UpvalueObj<'gc> {
     pub fn new(location: usize) -> Self {
