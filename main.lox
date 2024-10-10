@@ -159,3 +159,18 @@ class Oops {
 
 var oops = Oops();
 oops.field();
+
+class Doughnut {
+  cook() {
+    print "Dunk in the fryer.";
+  }
+}
+
+class Cruller < Doughnut {
+  finish() {
+    print "Glaze with icing.";
+  }
+}
+
+var c = Cruller();
+c.cook();

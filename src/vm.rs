@@ -447,6 +447,20 @@ impl<'gc> State<'gc> {
                     let arg_count = frame.read_byte();
                     self.invoke(method_name, arg_count);
                 }
+                OpCode::Inherit => {
+                    if let Value::Class(superclass) = self.peek(1) {
+                        let subclass = self.peek(0).as_class().unwrap();
+                        subclass
+                            .borrow_mut(self.mc)
+                            .methods
+                            .extend(&superclass.borrow().methods);
+                        self.pop_stack(); // Subclass
+                    } else {
+                        return Err(InterpretResult::RuntimeError(
+                            "Superclass must be a class.".into(),
+                        ));
+                    }
+                }
                 OpCode::Unknown => {
                     return Err(InterpretResult::RuntimeError("Unknown opcode".into()))
                 }

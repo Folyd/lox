@@ -45,6 +45,7 @@ pub enum OpCode {
     GetProperty,
     Method,
     Invoke,
+    Inherit,
     Unknown,
 }
 
@@ -198,6 +199,7 @@ impl<'gc> Chunk<'gc> {
                     );
                     return offset + 3;
                 }
+                OpCode::Inherit => return simple_instruction("INHERIT", offset),
                 OpCode::Unknown => {}
             }
         } else {

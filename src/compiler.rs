@@ -418,6 +418,19 @@ impl<'gc> Parser<'gc> {
             enclosing: self.class_compiler.take(),
         };
         self.class_compiler = Some(Box::new(class_compiler));
+
+        if self._match(TokenType::Less) {
+            self.consume(TokenType::Identifier, "Expect superclass name.");
+            self.variable(false);
+
+            if class_name == self.previous.lexeme {
+                self.error("A class can't inherit from itself.");
+            }
+
+            self.named_variable(class_name, false);
+            self.emit_byte(OpCode::Inherit);
+        }
+
         self.named_variable(class_name, false);
         self.consume(TokenType::LeftBrace, "Expect '{' before class body.");
         while !self.check(TokenType::RightBrace) && !self.check(TokenType::Eof) {
