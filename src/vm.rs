@@ -18,11 +18,9 @@ const FRAME_MAX_SIZE: usize = 64;
 const STACK_MAX_SIZE: usize = FRAME_MAX_SIZE * (u8::MAX as usize + 1);
 
 #[derive(Debug)]
-pub enum InterpretResult {
-    Ok,
-    #[allow(unused)]
+pub enum VmError {
     CompileError,
-    RuntimeError(Cow<'static, str>),
+    RuntimeError(String),
 }
 
 #[derive(Clone)]
@@ -130,7 +128,7 @@ impl Vm {
         }
     }
 
-    pub fn interpret(&mut self, source: &'static str) -> InterpretResult {
+    pub fn interpret(&mut self, source: &'static str) -> Result<(), VmError> {
         self.arena.mutate_root(|mc, state| {
             return match compile(mc, source) {
                 Ok(function) => {
@@ -138,15 +136,14 @@ impl Vm {
                     state.define_builtins();
                     let closure = Gc::new(mc, Closure::new(mc, Gc::new(mc, function)));
                     state.push_stack(Value::from(closure));
-                    state.call(closure, 0);
-                    InterpretResult::Ok
+                    state.call(closure, 0)
                 }
                 Err(err) => {
-                    println!("Compile error, {:?}", err);
-                    InterpretResult::CompileError
+                    eprintln!("{:?}", err);
+                    Err(VmError::CompileError)
                 }
             };
-        });
+        })?;
 
         loop {
             const FUEL_PER_GC: i32 = 4096;
@@ -173,15 +170,32 @@ impl Vm {
                         break;
                     }
                 }
-                Err(err) => return err,
+                Err(err) => return Err(err),
             }
         }
 
-        InterpretResult::Ok
+        Ok(())
     }
 }
 
 impl<'gc> State<'gc> {
+    fn runtime_error(&mut self, message: Cow<'static, str>) -> VmError {
+        let mut error_message = String::from(message);
+        (0..self.frame_count).rev().for_each(|i| {
+            let frame = &self.frames[i];
+            let function = &frame.closure.function;
+            error_message.push_str(&format!("\n[line {}] in ", function.chunk.line(frame.ip)));
+            let name = if function.name.is_empty() {
+                "script"
+            } else {
+                &*function.name
+            };
+            error_message.push_str(name);
+            error_message.push('\n');
+        });
+        VmError::RuntimeError(error_message)
+    }
+
     fn current_frame(&mut self) -> &mut CallFrame<'gc> {
         &mut self.frames[self.frame_count - 1]
     }
@@ -190,7 +204,7 @@ impl<'gc> State<'gc> {
     //
     // Returns `Ok(false)` if the method has exhausted its fuel, but there is more work to
     // do, and returns `Ok(true)` if no more progress can be made.
-    fn step(&mut self, fuel: &mut Fuel) -> Result<bool, InterpretResult> {
+    fn step(&mut self, fuel: &mut Fuel) -> Result<bool, VmError> {
         loop {
             // Debug stack info
             #[cfg(feature = "debug")]
@@ -217,9 +231,8 @@ impl<'gc> State<'gc> {
                         self.push_stack(Gc::new(self.mc, format!("{a}{b}")).into());
                     }
                     _ => {
-                        return Err(InterpretResult::RuntimeError(
-                            "Operands must be two numbers or two strings.".into(),
-                        ))
+                        return Err(self
+                            .runtime_error("Operands must be two numbers or two strings.".into()));
                     }
                 },
                 OpCode::Subtract => {
@@ -296,7 +309,7 @@ impl<'gc> State<'gc> {
                     if let Some(value) = self.globals.get(&varible_name) {
                         self.push_stack(*value);
                     } else {
-                        return Err(InterpretResult::RuntimeError(
+                        return Err(self.runtime_error(
                             format!("Undefined variable '{}'", varible_name).into(),
                         ));
                     }
@@ -308,7 +321,7 @@ impl<'gc> State<'gc> {
                     if self.globals.contains_key(&varible_name) {
                         self.globals.insert(varible_name, *self.peek(0));
                     } else {
-                        return Err(InterpretResult::RuntimeError(
+                        return Err(self.runtime_error(
                             format!("Undefined variable '{}'", varible_name).into(),
                         ));
                     }
@@ -342,7 +355,7 @@ impl<'gc> State<'gc> {
                 }
                 OpCode::Call => {
                     let arg_count = frame.read_byte();
-                    self.call_value(*self.peek(arg_count as usize), arg_count);
+                    self.call_value(*self.peek(arg_count as usize), arg_count)?;
                 }
                 OpCode::Closure => {
                     // frame.disassemble();
@@ -412,12 +425,10 @@ impl<'gc> State<'gc> {
                             self.pop_stack(); // Instance
                             self.push_stack(*property);
                         } else {
-                            self.bind_method(instance.borrow().class, name);
+                            self.bind_method(instance.borrow().class, name)?;
                         }
                     } else {
-                        return Err(InterpretResult::RuntimeError(
-                            "Only instances have properties.".into(),
-                        ));
+                        return Err(self.runtime_error("Only instances have properties.".into()));
                     }
                 }
                 OpCode::SetProperty => {
@@ -431,9 +442,7 @@ impl<'gc> State<'gc> {
                         self.pop_stack(); // Instance
                         self.push_stack(value);
                     } else {
-                        return Err(InterpretResult::RuntimeError(
-                            "Only instances have fields.".into(),
-                        ));
+                        return Err(self.runtime_error("Only instances have fields.".into()));
                     }
                 }
                 OpCode::Method => {
@@ -443,7 +452,7 @@ impl<'gc> State<'gc> {
                 OpCode::Invoke => {
                     let method_name = frame.read_string();
                     let arg_count = frame.read_byte();
-                    self.invoke(method_name, arg_count);
+                    self.invoke(method_name, arg_count)?;
                 }
                 OpCode::Inherit => {
                     if let Value::Class(superclass) = self.peek(1) {
@@ -454,25 +463,21 @@ impl<'gc> State<'gc> {
                             .extend(&superclass.borrow().methods);
                         self.pop_stack(); // Subclass
                     } else {
-                        return Err(InterpretResult::RuntimeError(
-                            "Superclass must be a class.".into(),
-                        ));
+                        return Err(self.runtime_error("Superclass must be a class.".into()));
                     }
                 }
                 OpCode::GetSuper => {
                     let name = frame.read_string();
                     let superclass = self.pop_stack().as_class().unwrap();
-                    self.bind_method(superclass, name);
+                    self.bind_method(superclass, name)?
                 }
                 OpCode::SuperInvoke => {
                     let method_name = frame.read_string();
                     let arg_count = frame.read_byte();
                     let superclass = self.pop_stack().as_class().unwrap();
-                    self.invoke_from_class(superclass, method_name, arg_count);
+                    self.invoke_from_class(superclass, method_name, arg_count)?;
                 }
-                OpCode::Unknown => {
-                    return Err(InterpretResult::RuntimeError("Unknown opcode".into()))
-                }
+                OpCode::Unknown => return Err(self.runtime_error("Unknown opcode.".into())),
             }
 
             const FUEL_PER_STEP: i32 = 4;
@@ -556,19 +561,24 @@ impl<'gc> State<'gc> {
         );
     }
 
-    fn bind_method(&mut self, class: GcRefLock<'gc, Class<'gc>>, name: Gc<'gc, String>) {
+    fn bind_method(
+        &mut self,
+        class: GcRefLock<'gc, Class<'gc>>,
+        name: Gc<'gc, String>,
+    ) -> Result<(), VmError> {
         if let Some(method) = class.borrow().methods.get(&name) {
             let bound = BoundMethod::new(*self.peek(0), (*method).as_closure().unwrap());
             // pop the instance and replace the top of
             // the stack with the bound method.
             self.pop_stack();
             self.push_stack(Value::from(Gc::new(self.mc, bound)));
+            Ok(())
         } else {
-            panic!("Undefined property '{}'", name);
+            Err(self.runtime_error(format!("Undefined property '{}'.", name).into()))
         }
     }
 
-    fn call_value(&mut self, callee: Value<'gc>, arg_count: u8) {
+    fn call_value(&mut self, callee: Value<'gc>, arg_count: u8) -> Result<(), VmError> {
         match callee {
             Value::BoundMethod(bound) => {
                 // inserts the receiver into the new CallFrame's slot zero.
@@ -591,7 +601,7 @@ impl<'gc> State<'gc> {
                            topping Callframe
                 */
                 self.stack[self.stack_top - arg_count as usize - 1] = bound.receiver;
-                self.call(bound.method, arg_count)
+                return self.call(bound.method, arg_count);
             }
             Value::Class(class) => {
                 let instance = Instance::new(class);
@@ -600,13 +610,15 @@ impl<'gc> State<'gc> {
                 // FIXME: interne init string
                 let init = Gc::new(self.mc, "init".to_owned());
                 if let Some(initializer) = class.borrow().methods.get(&init) {
-                    self.call(initializer.as_closure().unwrap(), arg_count);
+                    return self.call(initializer.as_closure().unwrap(), arg_count);
                 } else if arg_count != 0 {
-                    panic!("Expected 0 arguments but got {}", arg_count);
+                    return Err(self.runtime_error(
+                        format!("Expected 0 arguments but got {}.", arg_count).into(),
+                    ));
                 }
             }
             Value::Function(_) => {} //self.call(*function, arg_count),
-            Value::Closure(closure) => self.call(closure, arg_count),
+            Value::Closure(closure) => return self.call(closure, arg_count),
             Value::NativeFunction(function) => {
                 let result = function(self.pop_stack_n(arg_count as usize));
                 // Stack should be restored after native function called
@@ -614,9 +626,10 @@ impl<'gc> State<'gc> {
                 self.push_stack(result);
             }
             _ => {
-                panic!("Can only call functions and classes");
+                return Err(self.runtime_error("Can only call functions and classes.".into()));
             }
         }
+        Ok(())
     }
 
     fn invoke_from_class(
@@ -624,37 +637,40 @@ impl<'gc> State<'gc> {
         class: GcRefLock<'gc, Class<'gc>>,
         name: Gc<'gc, String>,
         arg_count: u8,
-    ) {
+    ) -> Result<(), VmError> {
         if let Some(method) = class.borrow().methods.get(&name) {
-            self.call(method.as_closure().unwrap(), arg_count);
+            self.call(method.as_closure().unwrap(), arg_count)
         } else {
-            panic!("Undefined property '{}'", name);
+            Err(self.runtime_error(format!("Undefined property '{}'.", name).into()))
         }
     }
 
-    fn invoke(&mut self, name: Gc<'gc, String>, arg_count: u8) {
+    fn invoke(&mut self, name: Gc<'gc, String>, arg_count: u8) -> Result<(), VmError> {
         let receiver = self.peek(arg_count as usize);
         if let Value::Instance(instance) = receiver {
             if let Some(value) = instance.borrow().fields.get(&name) {
                 self.stack[self.stack_top - arg_count as usize - 1] = *value;
                 return self.call_value(*value, arg_count);
             }
-            self.invoke_from_class(instance.borrow().class, name, arg_count);
+            self.invoke_from_class(instance.borrow().class, name, arg_count)
         } else {
-            panic!("Only instances have methods");
+            Err(self.runtime_error("Only instances have methods.".into()))
         }
     }
 
-    fn call(&mut self, closure: Gc<'gc, Closure<'gc>>, arg_count: u8) {
+    fn call(&mut self, closure: Gc<'gc, Closure<'gc>>, arg_count: u8) -> Result<(), VmError> {
         // closure.function.disassemble("fn");
         if arg_count != closure.function.arity {
-            panic!(
-                "Expected {} arguments but got {}",
-                closure.function.arity, arg_count
-            );
+            return Err(self.runtime_error(
+                format!(
+                    "Expected {} arguments but got {}.",
+                    closure.function.arity, arg_count
+                )
+                .into(),
+            ));
         }
         if self.frame_count == FRAME_MAX_SIZE {
-            panic!("Too many active frames");
+            return Err(self.runtime_error("Too many active frames.".into()));
         }
 
         let call_frame = CallFrame {
@@ -665,6 +681,7 @@ impl<'gc> State<'gc> {
         // self.frames[self.frame_count] = call_frame;
         self.frames.push(call_frame);
         self.frame_count += 1;
+        Ok(())
     }
 
     fn push_stack(&mut self, value: Value<'gc>) {

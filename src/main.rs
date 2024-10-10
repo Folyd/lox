@@ -30,12 +30,13 @@ fn run_file(path: &str) {
     let source = fs::read_to_string(path).unwrap();
     let source: &'static str = Box::leak(source.into_boxed_str());
     let mut vm = Vm::new();
-    match vm.interpret(source) {
-        vm::InterpretResult::CompileError => exit(70),
-        vm::InterpretResult::RuntimeError(err) => {
-            println!("RuntimeError: {err}");
-            exit(70)
+    if let Err(err) = vm.interpret(source) {
+        match err {
+            vm::VmError::CompileError => exit(70),
+            vm::VmError::RuntimeError(err) => {
+                eprintln!("{err}");
+                exit(70)
+            }
         }
-        _ => {}
     }
 }

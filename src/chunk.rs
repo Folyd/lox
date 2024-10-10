@@ -87,6 +87,10 @@ impl<'gc> Chunk<'gc> {
         }
     }
 
+    pub fn line(&self, offset: usize) -> u32 {
+        self.lines[offset]
+    }
+
     pub fn code_size(&self) -> usize {
         self.code.len()
     }

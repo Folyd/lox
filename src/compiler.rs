@@ -4,7 +4,7 @@ use std::{array, mem, ops::Add};
 use crate::{
     object::{Function, FunctionType},
     scanner::{Scanner, Token, TokenType},
-    vm::InterpretResult,
+    vm::VmError,
     OpCode, Value,
 };
 use gc_arena::{Gc, Mutation};
@@ -581,14 +581,14 @@ impl<'gc> Parser<'gc> {
 }
 
 impl<'gc> Parser<'gc> {
-    fn compile(&mut self) -> Result<(), InterpretResult> {
+    fn compile(&mut self) -> Result<(), VmError> {
         self.advance();
         while !self._match(TokenType::Eof) {
             self.declaration();
         }
         self.emit_return();
         if self.had_error {
-            return Err(InterpretResult::CompileError);
+            return Err(VmError::CompileError);
         }
         // Ok(self.compiler.function)
         Ok(())
@@ -1037,7 +1037,7 @@ impl<'gc> ParseRule<'gc> {
 pub fn compile<'gc>(
     mutation: &'gc Mutation<'gc>,
     source: &'gc str,
-) -> Result<Function<'gc>, InterpretResult> {
+) -> Result<Function<'gc>, VmError> {
     let mut parser = Parser::new(mutation, source);
     parser.compile()?;
     Ok(parser.compiler.function)
