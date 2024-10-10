@@ -32,7 +32,7 @@ fn run_file(path: &str) {
     let mut vm = Vm::new();
     if let Err(err) = vm.interpret(source) {
         match err {
-            vm::VmError::CompileError => exit(70),
+            vm::VmError::CompileError => exit(65),
             vm::VmError::RuntimeError(err) => {
                 eprintln!("{err}");
                 exit(70)

@@ -867,15 +867,15 @@ impl<'gc> Parser<'gc> {
             return;
         }
         self.panic_mode = true;
-        eprintln!("[line {}] Error: {}", token.line, message);
+        eprint!("[line {}] Error", token.line);
         if token.kind == TokenType::Eof {
-            eprintln!(" at end");
+            eprint!(" at end");
         } else if token.kind == TokenType::Error {
             // Do nothing.
         } else {
-            eprintln!(" at '{}'", token.lexeme);
+            eprint!(" at '{}'", token.lexeme);
         }
-        eprintln!("{message}");
+        eprintln!(": {message}");
         self.had_error = true;
     }
 }

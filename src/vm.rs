@@ -16,6 +16,15 @@ use crate::{
 
 const FRAME_MAX_SIZE: usize = 64;
 const STACK_MAX_SIZE: usize = FRAME_MAX_SIZE * (u8::MAX as usize + 1);
+static NUMBER_OPERATOR_ERROR: &str = "Operands must be numbers.";
+
+macro_rules! binary_op {
+    ($self:expr, $op:tt) => {
+        let b = $self.pop_stack().as_number().map_err(|_| $self.runtime_error(NUMBER_OPERATOR_ERROR.into()))?;
+        let a = $self.pop_stack().as_number().map_err(|_| $self.runtime_error(NUMBER_OPERATOR_ERROR.into()))?;
+        $self.push_stack((a $op b).into());
+    };
+}
 
 #[derive(Debug)]
 pub enum VmError {
@@ -130,19 +139,12 @@ impl Vm {
 
     pub fn interpret(&mut self, source: &'static str) -> Result<(), VmError> {
         self.arena.mutate_root(|mc, state| {
-            return match compile(mc, source) {
-                Ok(function) => {
-                    // function.disassemble("script");
-                    state.define_builtins();
-                    let closure = Gc::new(mc, Closure::new(mc, Gc::new(mc, function)));
-                    state.push_stack(Value::from(closure));
-                    state.call(closure, 0)
-                }
-                Err(err) => {
-                    eprintln!("{:?}", err);
-                    Err(VmError::CompileError)
-                }
-            };
+            let function = compile(mc, source)?;
+            // function.disassemble("script");
+            state.define_builtins();
+            let closure = Gc::new(mc, Closure::new(mc, Gc::new(mc, function)));
+            state.push_stack(Value::from(closure));
+            state.call(closure, 0)
         })?;
 
         loop {
@@ -221,13 +223,11 @@ impl<'gc> State<'gc> {
                 }
                 OpCode::Add => match (self.peek(0), self.peek(1)) {
                     (Value::Number(_), Value::Number(_)) => {
-                        let a = self.pop_stack().as_number().unwrap();
-                        let b = self.pop_stack().as_number().unwrap();
-                        self.push_stack((a + b).into());
+                        binary_op!(self, +);
                     }
                     (Value::String(_), Value::String(_)) => {
-                        let b = self.pop_stack().as_string().unwrap();
-                        let a = self.pop_stack().as_string().unwrap();
+                        let b = self.pop_stack().as_string()?;
+                        let a = self.pop_stack().as_string()?;
                         self.push_stack(Gc::new(self.mc, format!("{a}{b}")).into());
                     }
                     _ => {
@@ -236,22 +236,19 @@ impl<'gc> State<'gc> {
                     }
                 },
                 OpCode::Subtract => {
-                    let b = self.pop_stack().as_number().unwrap();
-                    let a = self.pop_stack().as_number().unwrap();
-                    self.push_stack((a - b).into());
+                    binary_op!(self, -);
                 }
                 OpCode::Multiply => {
-                    let b = self.pop_stack().as_number().unwrap();
-                    let a = self.pop_stack().as_number().unwrap();
-                    self.push_stack((a * b).into());
+                    binary_op!(self, *);
                 }
                 OpCode::Divide => {
-                    let b = self.pop_stack().as_number().unwrap();
-                    let a = self.pop_stack().as_number().unwrap();
-                    self.push_stack((a / b).into());
+                    binary_op!(self, /);
                 }
                 OpCode::Negate => {
-                    let v = self.pop_stack().as_number().unwrap();
+                    let v = self
+                        .pop_stack()
+                        .as_number()
+                        .map_err(|_| self.runtime_error("Operand must be a number".into()))?;
                     self.push_stack((-v).into());
                 }
                 OpCode::Return => {
@@ -272,7 +269,7 @@ impl<'gc> State<'gc> {
                 OpCode::True => self.push_stack(Value::Boolean(true)),
                 OpCode::False => self.push_stack(Value::Boolean(false)),
                 OpCode::Not => {
-                    let v = self.pop_stack().as_boolean().unwrap();
+                    let v = self.pop_stack().as_boolean()?;
                     self.push_stack((!v).into())
                 }
                 OpCode::Equal => {
@@ -281,14 +278,10 @@ impl<'gc> State<'gc> {
                     self.push_stack(a.equals(&b).into());
                 }
                 OpCode::Greater => {
-                    let b = self.pop_stack().as_number().unwrap();
-                    let a = self.pop_stack().as_number().unwrap();
-                    self.push_stack((a > b).into());
+                    binary_op!(self, >);
                 }
                 OpCode::Less => {
-                    let b = self.pop_stack().as_number().unwrap();
-                    let a = self.pop_stack().as_number().unwrap();
-                    self.push_stack((a < b).into());
+                    binary_op!(self, <);
                 }
                 OpCode::Print => {
                     let value = self.pop_stack();
@@ -299,13 +292,13 @@ impl<'gc> State<'gc> {
                 }
                 OpCode::DefineGlobal => {
                     let byte = frame.read_byte();
-                    let varible_name = frame.read_constant(byte).as_string().unwrap();
+                    let varible_name = frame.read_constant(byte).as_string()?;
                     self.globals.insert(varible_name, *self.peek(0));
                     self.pop_stack();
                 }
                 OpCode::GetGlobal => {
                     let byte = frame.read_byte();
-                    let varible_name = frame.read_constant(byte).as_string().unwrap();
+                    let varible_name = frame.read_constant(byte).as_string()?;
                     if let Some(value) = self.globals.get(&varible_name) {
                         self.push_stack(*value);
                     } else {
@@ -316,7 +309,7 @@ impl<'gc> State<'gc> {
                 }
                 OpCode::SetGlobal => {
                     let byte = frame.read_byte();
-                    let varible_name = frame.read_constant(byte).as_string().unwrap();
+                    let varible_name = frame.read_constant(byte).as_string()?;
                     #[allow(clippy::map_entry)]
                     if self.globals.contains_key(&varible_name) {
                         self.globals.insert(varible_name, *self.peek(0));
@@ -360,7 +353,7 @@ impl<'gc> State<'gc> {
                 OpCode::Closure => {
                     // frame.disassemble();
                     let byte = frame.read_byte();
-                    let function = frame.read_constant(byte).as_function().unwrap();
+                    let function = frame.read_constant(byte).as_function()?;
                     // let fn_name = function.name;
                     let mut closure = Closure::new(self.mc, function);
 
@@ -456,7 +449,7 @@ impl<'gc> State<'gc> {
                 }
                 OpCode::Inherit => {
                     if let Value::Class(superclass) = self.peek(1) {
-                        let subclass = self.peek(0).as_class().unwrap();
+                        let subclass = self.peek(0).as_class()?;
                         subclass
                             .borrow_mut(self.mc)
                             .methods
@@ -468,13 +461,13 @@ impl<'gc> State<'gc> {
                 }
                 OpCode::GetSuper => {
                     let name = frame.read_string();
-                    let superclass = self.pop_stack().as_class().unwrap();
+                    let superclass = self.pop_stack().as_class()?;
                     self.bind_method(superclass, name)?
                 }
                 OpCode::SuperInvoke => {
                     let method_name = frame.read_string();
                     let arg_count = frame.read_byte();
-                    let superclass = self.pop_stack().as_class().unwrap();
+                    let superclass = self.pop_stack().as_class()?;
                     self.invoke_from_class(superclass, method_name, arg_count)?;
                 }
                 OpCode::Unknown => return Err(self.runtime_error("Unknown opcode.".into())),
@@ -567,7 +560,7 @@ impl<'gc> State<'gc> {
         name: Gc<'gc, String>,
     ) -> Result<(), VmError> {
         if let Some(method) = class.borrow().methods.get(&name) {
-            let bound = BoundMethod::new(*self.peek(0), (*method).as_closure().unwrap());
+            let bound = BoundMethod::new(*self.peek(0), (*method).as_closure()?);
             // pop the instance and replace the top of
             // the stack with the bound method.
             self.pop_stack();
@@ -610,7 +603,7 @@ impl<'gc> State<'gc> {
                 // FIXME: interne init string
                 let init = Gc::new(self.mc, "init".to_owned());
                 if let Some(initializer) = class.borrow().methods.get(&init) {
-                    return self.call(initializer.as_closure().unwrap(), arg_count);
+                    return self.call(initializer.as_closure()?, arg_count);
                 } else if arg_count != 0 {
                     return Err(self.runtime_error(
                         format!("Expected 0 arguments but got {}.", arg_count).into(),
@@ -639,7 +632,7 @@ impl<'gc> State<'gc> {
         arg_count: u8,
     ) -> Result<(), VmError> {
         if let Some(method) = class.borrow().methods.get(&name) {
-            self.call(method.as_closure().unwrap(), arg_count)
+            self.call(method.as_closure()?, arg_count)
         } else {
             Err(self.runtime_error(format!("Undefined property '{}'.", name).into()))
         }

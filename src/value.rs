@@ -1,9 +1,12 @@
-use std::{borrow::Cow, fmt::Display};
+use std::fmt::Display;
 
 use gc_arena::{lock::GcRefLock, Collect, Gc};
 use ustr::Ustr;
 
-use crate::object::{BoundMethod, Class, Closure, Function, Instance, NativeFn};
+use crate::{
+    object::{BoundMethod, Class, Closure, Function, Instance, NativeFn},
+    vm::VmError,
+};
 
 #[derive(Debug, Copy, Clone)]
 pub enum Value<'gc> {
@@ -74,14 +77,16 @@ impl<'gc> Value<'gc> {
         }
     }
 
-    pub fn as_number(self) -> Result<f64, Cow<'static, str>> {
+    pub fn as_number(self) -> Result<f64, VmError> {
         match self {
             Value::Number(value) => Ok(value),
-            a => Err(format!("cannot convert to number: {:?}", a).into()),
+            a => Err(VmError::RuntimeError(
+                format!("cannot convert to number: {:?}", a),
+            )),
         }
     }
 
-    pub fn as_boolean(&self) -> Result<bool, &'static str> {
+    pub fn as_boolean(&self) -> Result<bool, VmError> {
         match self {
             Value::Boolean(value) => Ok(*value),
             Value::Number(value) => Ok(*value != 0.0),
@@ -90,45 +95,47 @@ impl<'gc> Value<'gc> {
         }
     }
 
-    pub fn as_string(self) -> Result<Gc<'gc, String>, &'static str> {
+    pub fn as_string(self) -> Result<Gc<'gc, String>, VmError> {
         match self {
             Value::String(value) => Ok(value),
-            _ => Err("cannot convert to string"),
+            _ => Err(VmError::RuntimeError("cannot convert to string.".into())),
         }
     }
 
-    pub fn as_closure(self) -> Result<Gc<'gc, Closure<'gc>>, &'static str> {
+    pub fn as_closure(self) -> Result<Gc<'gc, Closure<'gc>>, VmError> {
         match self {
             Value::Closure(closure) => Ok(closure),
-            _ => Err("cannot convert to closure"),
+            _ => Err(VmError::RuntimeError("cannot convert to closure.".into())),
         }
     }
 
-    pub fn as_function(self) -> Result<Gc<'gc, Function<'gc>>, &'static str> {
+    pub fn as_function(self) -> Result<Gc<'gc, Function<'gc>>, VmError> {
         match self {
             Value::Function(function) => Ok(function),
-            _ => Err("cannot convert to function"),
+            _ => Err(VmError::RuntimeError("cannot convert to function.".into())),
         }
     }
 
-    pub fn as_class(self) -> Result<GcRefLock<'gc, Class<'gc>>, &'static str> {
+    pub fn as_class(self) -> Result<GcRefLock<'gc, Class<'gc>>, VmError> {
         match self {
             Value::Class(class) => Ok(class),
-            _ => Err("cannot convert to class"),
+            _ => Err(VmError::RuntimeError("cannot convert to class.".into())),
         }
     }
 
-    pub fn as_instance(self) -> Result<GcRefLock<'gc, Instance<'gc>>, &'static str> {
+    pub fn as_instance(self) -> Result<GcRefLock<'gc, Instance<'gc>>, VmError> {
         match self {
             Value::Instance(instance) => Ok(instance),
-            _ => Err("cannot convert to instance"),
+            _ => Err(VmError::RuntimeError("cannot convert to instance".into())),
         }
     }
 
-    pub fn as_bound_method(self) -> Result<Gc<'gc, BoundMethod<'gc>>, &'static str> {
+    pub fn as_bound_method(self) -> Result<Gc<'gc, BoundMethod<'gc>>, VmError> {
         match self {
             Value::BoundMethod(bm) => Ok(bm),
-            _ => Err("cannot convert to bound method"),
+            _ => Err(VmError::RuntimeError(
+                "cannot convert to bound method".into(),
+            )),
         }
     }
 
