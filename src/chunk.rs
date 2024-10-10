@@ -46,6 +46,7 @@ pub enum OpCode {
     Method,
     Invoke,
     Inherit,
+    GetSuper,
     Unknown,
 }
 
@@ -200,6 +201,7 @@ impl<'gc> Chunk<'gc> {
                     return offset + 3;
                 }
                 OpCode::Inherit => return simple_instruction("INHERIT", offset),
+                OpCode::GetSuper => return self.constant_instruction("GET_SUPER", offset),
                 OpCode::Unknown => {}
             }
         } else {

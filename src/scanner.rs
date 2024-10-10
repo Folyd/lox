@@ -73,6 +73,10 @@ impl<'a> Token<'a> {
             line,
         }
     }
+
+    pub fn identifier(name: &'a str) -> Self {
+        Token::new(TokenType::Identifier, name, 0)
+    }
 }
 
 pub struct Scanner<'a> {

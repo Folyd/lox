@@ -163,14 +163,20 @@ oops.field();
 class Doughnut {
   cook() {
     print "Dunk in the fryer.";
+    this.finish("sprinkles");
+  }
+
+  finish(ingredient) {
+    print "Finish with " + ingredient;
   }
 }
 
 class Cruller < Doughnut {
-  finish() {
-    print "Glaze with icing.";
+  finish(ingredient) {
+    // No sprinkles, always icing.
+    super.finish("icing");
   }
 }
 
-var c = Cruller();
-c.cook();
+var cruller = Cruller();
+cruller.finish("cruller");

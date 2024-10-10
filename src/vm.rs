@@ -411,10 +411,8 @@ impl<'gc> State<'gc> {
                         if let Some(property) = instance.borrow().fields.get(&name) {
                             self.pop_stack(); // Instance
                             self.push_stack(*property);
-                        } else if !self.bind_method(instance.borrow().class, name) {
-                            return Err(InterpretResult::RuntimeError(
-                                format!("Undefined property '{}'", name).into(),
-                            ));
+                        } else {
+                            self.bind_method(instance.borrow().class, name);
                         }
                     } else {
                         return Err(InterpretResult::RuntimeError(
@@ -460,6 +458,11 @@ impl<'gc> State<'gc> {
                             "Superclass must be a class.".into(),
                         ));
                     }
+                }
+                OpCode::GetSuper => {
+                    let name = frame.read_string();
+                    let superclass = self.pop_stack().as_class().unwrap();
+                    self.bind_method(superclass, name);
                 }
                 OpCode::Unknown => {
                     return Err(InterpretResult::RuntimeError("Unknown opcode".into()))
@@ -547,14 +550,13 @@ impl<'gc> State<'gc> {
         );
     }
 
-    fn bind_method(&mut self, class: GcRefLock<'gc, Class<'gc>>, name: Gc<'gc, String>) -> bool {
+    fn bind_method(&mut self, class: GcRefLock<'gc, Class<'gc>>, name: Gc<'gc, String>) {
         if let Some(method) = class.borrow().methods.get(&name) {
             let bound = BoundMethod::new(*self.peek(0), (*method).as_closure().unwrap());
             // pop the instance and replace the top of
             // the stack with the bound method.
             self.pop_stack();
             self.push_stack(Value::from(Gc::new(self.mc, bound)));
-            true
         } else {
             panic!("Undefined property '{}'", name);
         }
@@ -564,7 +566,7 @@ impl<'gc> State<'gc> {
         match callee {
             Value::BoundMethod(bound) => {
                 // inserts the receiver into the new CallFrame's slot zero.
-                // normally, the receiver is 'this' keyword.
+                // normally, the receiver is 'this' or 'super' keyword.
                 /*
                    Diagram for this: scone.topping("berries", "cream");
 

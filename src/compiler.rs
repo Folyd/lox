@@ -87,6 +87,7 @@ pub struct Compiler<'gc> {
 #[derive(Default)]
 struct ClassCompiler {
     enclosing: Option<Box<ClassCompiler>>,
+    has_superclass: bool,
 }
 
 impl<'gc> Parser<'gc> {
@@ -416,6 +417,7 @@ impl<'gc> Parser<'gc> {
 
         let class_compiler = ClassCompiler {
             enclosing: self.class_compiler.take(),
+            has_superclass: false,
         };
         self.class_compiler = Some(Box::new(class_compiler));
 
@@ -427,8 +429,18 @@ impl<'gc> Parser<'gc> {
                 self.error("A class can't inherit from itself.");
             }
 
+            // Creating a new lexical scope ensures that if we declare two classes in the same scope,
+            // each has a different local slot to store its superclass. Since we always name this
+            // variable “super”, if we didn’t make a scope for each subclass, the variables would collide.
+            self.begin_scope();
+            self.add_local(Token::identifier("super"));
+            self.define_variable(0);
+
             self.named_variable(class_name, false);
             self.emit_byte(OpCode::Inherit);
+            if let Some(class_compiler) = self.class_compiler.as_mut() {
+                class_compiler.has_superclass = true;
+            }
         }
 
         self.named_variable(class_name, false);
@@ -440,6 +452,12 @@ impl<'gc> Parser<'gc> {
         // Once we’ve reached the end of the methods, we no longer need
         // the class and tell the VM to pop it off the stack.
         self.emit_byte(OpCode::Pop);
+
+        if self.class_compiler.as_ref().map(|c| c.has_superclass) == Some(true) {
+            // Since we opened a local scope for the superclass variable, we need to close it.
+            self.end_scope();
+        }
+
         // pop that compiler off the stack and restore the enclosing class compiler.
         self.class_compiler = self.class_compiler.take().and_then(|c| c.enclosing);
     }
@@ -757,6 +775,22 @@ impl<'gc> Parser<'gc> {
         arg_count
     }
 
+    fn super_(&mut self, _can_assign: bool) {
+        if self.class_compiler.is_none() {
+            self.error("Can't use 'super' outside of a class.");
+        } else if self.class_compiler.as_ref().map(|c| c.has_superclass) == Some(false) {
+            self.error("Can't use 'super' in a class with no superclass.");
+        }
+
+        self.consume(TokenType::Dot, "Expect '.' after 'super'.");
+        self.consume(TokenType::Identifier, "Expect superclass method name.");
+        let method_name = self.identifier_constant(self.previous.lexeme);
+
+        self.named_variable("this", false);
+        self.named_variable("super", false);
+        self.emit_bytes(OpCode::GetSuper, method_name as u8);
+    }
+
     fn this(&mut self, _can_assign: bool) {
         if self.class_compiler.is_none() {
             self.error("Can't use 'this' outside of a class.");
@@ -985,6 +1019,7 @@ impl<'gc> ParseRule<'gc> {
             TokenType::False => Self::new(Some(Parser::literal), None, Precedence::None),
             TokenType::Nil => Self::new(Some(Parser::literal), None, Precedence::None),
             TokenType::Or => Self::new(None, Some(Parser::or), Precedence::Or),
+            TokenType::Super => Self::new(Some(Parser::super_), None, Precedence::None),
             TokenType::This => Self::new(Some(Parser::this), None, Precedence::None),
             TokenType::True => Self::new(Some(Parser::literal), None, Precedence::None),
             _ => Self::new(None, None, Precedence::None),
