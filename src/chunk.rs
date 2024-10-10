@@ -44,6 +44,7 @@ pub enum OpCode {
     SetProperty,
     GetProperty,
     Method,
+    Invoke,
     Unknown,
 }
 
@@ -188,6 +189,15 @@ impl<'gc> Chunk<'gc> {
                 OpCode::SetProperty => return self.constant_instruction("SET_PROPERTY", offset),
                 OpCode::GetProperty => return self.constant_instruction("GET_PROPERTY", offset),
                 OpCode::Method => return self.constant_instruction("METHOD", offset),
+                OpCode::Invoke => {
+                    let constant = self.code[offset + 1];
+                    let arg_count = self.code[offset + 2];
+                    println!(
+                        "{:-16} ({} args) {} '{}'",
+                        "OP_INVOKE", arg_count, constant, self.constans[constant as usize]
+                    );
+                    return offset + 3;
+                }
                 OpCode::Unknown => {}
             }
         } else {

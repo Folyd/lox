@@ -442,6 +442,11 @@ impl<'gc> State<'gc> {
                     let name = frame.read_string();
                     self.define_method(name);
                 }
+                OpCode::Invoke => {
+                    let method_name = frame.read_string();
+                    let arg_count = frame.read_byte();
+                    self.invoke(method_name, arg_count);
+                }
                 OpCode::Unknown => {
                     return Err(InterpretResult::RuntimeError("Unknown opcode".into()))
                 }
@@ -589,6 +594,28 @@ impl<'gc> State<'gc> {
             _ => {
                 panic!("Can only call functions and classes");
             }
+        }
+    }
+
+    fn invoke_from_class(
+        &mut self,
+        class: GcRefLock<'gc, Class<'gc>>,
+        name: Gc<'gc, String>,
+        arg_count: u8,
+    ) {
+        if let Some(method) = class.borrow().methods.get(&name) {
+            self.call(method.as_closure().unwrap(), arg_count);
+        } else {
+            panic!("Undefined property '{}'", name);
+        }
+    }
+
+    fn invoke(&mut self, name: Gc<'gc, String>, arg_count: u8) {
+        let receiver = self.peek(arg_count as usize);
+        if let Value::Instance(instance) = receiver {
+            self.invoke_from_class(instance.borrow().class, name, arg_count);
+        } else {
+            panic!("Only instances have methods");
         }
     }
 

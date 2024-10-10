@@ -656,6 +656,10 @@ impl<'gc> Parser<'gc> {
         if can_assign && self._match(TokenType::Equal) {
             self.expression();
             self.emit_bytes(OpCode::SetProperty, name_constant);
+        } else if self._match(TokenType::LeftParen) {
+            let arg_count = self.argument_list();
+            self.emit_bytes(OpCode::Invoke, name_constant);
+            self.emit_byte(arg_count);
         } else {
             self.emit_bytes(OpCode::GetProperty, name_constant);
         }
