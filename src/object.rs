@@ -58,6 +58,7 @@ pub type NativeFn<'gc> = fn(Vec<Value<'gc>>) -> Value<'gc>;
 pub enum FunctionType {
     Function,
     Method,
+    Initializer,
     Script,
 }
 

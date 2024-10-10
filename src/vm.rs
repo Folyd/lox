@@ -551,8 +551,7 @@ impl<'gc> State<'gc> {
 
                                                    stackTop
                                                        |
-                       <---- -1 ---->                  |
-                               <------ argCount ---->  |
+                    <-- -1 --> <------ argCount ---->  |
                        0         1         2         3 v
                        |         |         |         |
                        v         v         v         v
@@ -571,6 +570,13 @@ impl<'gc> State<'gc> {
                 let instance = Instance::new(class);
                 self.stack[self.stack_top - arg_count as usize - 1] =
                     Value::from(Gc::new(self.mc, RefLock::new(instance)));
+                // FIXME: interne init string
+                let init = Gc::new(self.mc, "init".to_owned());
+                if let Some(initializer) = class.borrow().methods.get(&init) {
+                    self.call(initializer.as_closure().unwrap(), arg_count);
+                } else if arg_count != 0 {
+                    panic!("Expected 0 arguments but got {}", arg_count);
+                }
             }
             Value::Function(_) => {} //self.call(*function, arg_count),
             Value::Closure(closure) => self.call(closure, arg_count),

@@ -123,7 +123,11 @@ impl<'gc> Parser<'gc> {
     }
 
     fn emit_return(&mut self) {
-        self.emit_byte(OpCode::Nil);
+        if self.compiler.fn_type == FunctionType::Initializer {
+            self.emit_bytes(OpCode::GetLocal, 0);
+        } else {
+            self.emit_byte(OpCode::Nil);
+        }
         self.emit_byte(OpCode::Return);
     }
 
@@ -312,6 +316,10 @@ impl<'gc> Parser<'gc> {
         if self._match(TokenType::Semicolon) {
             self.emit_return();
         } else {
+            if self.compiler.fn_type == FunctionType::Initializer {
+                self.error("Can't return a value from an initializer.");
+            }
+
             self.expression();
             self.consume(TokenType::Semicolon, "Expect ';' after return value.");
             self.emit_byte(OpCode::Return);
@@ -426,7 +434,11 @@ impl<'gc> Parser<'gc> {
     fn method(&mut self) {
         self.consume(TokenType::Identifier, "Expect method name.");
         let name_constant = self.identifier_constant(self.previous.lexeme);
-        self.function(FunctionType::Method);
+        let mut fn_type = FunctionType::Method;
+        if self.previous.lexeme == "init" {
+            fn_type = FunctionType::Initializer;
+        }
+        self.function(fn_type);
         self.emit_bytes(OpCode::Method, name_constant as u8);
     }
 
