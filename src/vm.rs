@@ -613,6 +613,10 @@ impl<'gc> State<'gc> {
     fn invoke(&mut self, name: Gc<'gc, String>, arg_count: u8) {
         let receiver = self.peek(arg_count as usize);
         if let Value::Instance(instance) = receiver {
+            if let Some(value) = instance.borrow().fields.get(&name) {
+                self.stack[self.stack_top - arg_count as usize - 1] = *value;
+                return self.call_value(*value, arg_count);
+            }
             self.invoke_from_class(instance.borrow().class, name, arg_count);
         } else {
             panic!("Only instances have methods");
