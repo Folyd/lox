@@ -269,7 +269,9 @@ impl<'a> Scanner<'a> {
                     self.advance();
                     return self.make_token(TokenType::String);
                 }
-                _ => {}
+                _ => {
+                    return Token::new(TokenType::Error, "Unexpected character.", self.line);
+                }
             }
         }
 

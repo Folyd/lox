@@ -73,6 +73,14 @@ impl<'gc> Value<'gc> {
             (Value::Boolean(a), Value::Boolean(b)) => a == b,
             (Value::String(a), Value::String(b)) => a == b,
             (Value::Nil, Value::Nil) => true,
+            (Value::Class(a), Value::Class(b)) => a.borrow().name == b.borrow().name,
+            (Value::Closure(a), Value::Closure(b)) => a.function.name == b.function.name,
+            (Value::Instance(a), Value::Instance(b)) => {
+                a.borrow().class.borrow().name == b.borrow().class.borrow().name
+            }
+            (Value::BoundMethod(a), Value::BoundMethod(b)) => {
+                a.method.function.name == b.method.function.name
+            }
             _ => false,
         }
     }
@@ -80,18 +88,19 @@ impl<'gc> Value<'gc> {
     pub fn as_number(self) -> Result<f64, VmError> {
         match self {
             Value::Number(value) => Ok(value),
-            a => Err(VmError::RuntimeError(
-                format!("cannot convert to number: {:?}", a),
-            )),
+            a => Err(VmError::RuntimeError(format!(
+                "cannot convert to number: {:?}",
+                a
+            ))),
         }
     }
 
-    pub fn as_boolean(&self) -> Result<bool, VmError> {
+    pub fn as_boolean(&self) -> bool {
         match self {
-            Value::Boolean(value) => Ok(*value),
-            Value::Number(value) => Ok(*value != 0.0),
-            Value::String(s) => Ok(!s.is_empty()),
-            _ => Ok(false),
+            Value::Boolean(value) => *value,
+            Value::Number(value) => *value != 0.0,
+            Value::String(s) => !s.is_empty(),
+            _ => false,
         }
     }
 
@@ -176,7 +185,7 @@ impl<'gc> Value<'gc> {
     }
 
     pub fn is_falsy(&self) -> bool {
-        self.is_nil() || !self.as_boolean().unwrap_or(false)
+        self.is_nil() || (self.is_boolean() && !self.as_boolean())
     }
 }
 

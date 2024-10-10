@@ -248,7 +248,7 @@ impl<'gc> State<'gc> {
                     let v = self
                         .pop_stack()
                         .as_number()
-                        .map_err(|_| self.runtime_error("Operand must be a number".into()))?;
+                        .map_err(|_| self.runtime_error("Operand must be a number.".into()))?;
                     self.push_stack((-v).into());
                 }
                 OpCode::Return => {
@@ -269,8 +269,8 @@ impl<'gc> State<'gc> {
                 OpCode::True => self.push_stack(Value::Boolean(true)),
                 OpCode::False => self.push_stack(Value::Boolean(false)),
                 OpCode::Not => {
-                    let v = self.pop_stack().as_boolean()?;
-                    self.push_stack((!v).into())
+                    let v = self.pop_stack().is_falsy();
+                    self.push_stack((v).into())
                 }
                 OpCode::Equal => {
                     let b = self.pop_stack();
@@ -303,7 +303,7 @@ impl<'gc> State<'gc> {
                         self.push_stack(*value);
                     } else {
                         return Err(self.runtime_error(
-                            format!("Undefined variable '{}'", varible_name).into(),
+                            format!("Undefined variable '{}'.", varible_name).into(),
                         ));
                     }
                 }
@@ -315,7 +315,7 @@ impl<'gc> State<'gc> {
                         self.globals.insert(varible_name, *self.peek(0));
                     } else {
                         return Err(self.runtime_error(
-                            format!("Undefined variable '{}'", varible_name).into(),
+                            format!("Undefined variable '{}'.", varible_name).into(),
                         ));
                     }
                 }
@@ -663,7 +663,7 @@ impl<'gc> State<'gc> {
             ));
         }
         if self.frame_count == FRAME_MAX_SIZE {
-            return Err(self.runtime_error("Too many active frames.".into()));
+            return Err(self.runtime_error("Stack overflow.".into()));
         }
 
         let call_frame = CallFrame {

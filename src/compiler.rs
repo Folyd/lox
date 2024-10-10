@@ -620,19 +620,19 @@ impl<'gc> Parser<'gc> {
         self.previous = mem::take(&mut self.current);
         while let Some(token) = self.scanner.next() {
             self.current = token;
-            if self.previous.kind == TokenType::Bang
-                && !matches!(
-                    self.current.kind,
-                    TokenType::True
-                        | TokenType::False
-                        | TokenType::Nil
-                        | TokenType::Bang
-                        | TokenType::LeftParen
-                )
-            {
-                self.error("! operator can only be used on booleans and nil.");
-                break;
-            }
+            // if self.previous.kind == TokenType::Bang
+            //     && !matches!(
+            //         self.current.kind,
+            //         TokenType::True
+            //             | TokenType::False
+            //             | TokenType::Nil
+            //             | TokenType::Bang
+            //             | TokenType::LeftParen
+            //     )
+            // {
+            //     self.error("! operator can only be used on booleans and nil.");
+            //     break;
+            // }
 
             if self.current.kind != TokenType::Error {
                 break;
@@ -654,7 +654,7 @@ impl<'gc> Parser<'gc> {
         if let Some(prefix_fn) = rule.prefix {
             prefix_fn(self, can_assign);
         } else {
-            self.error("Parse precedence: expect expression.");
+            self.error("Expect expression.");
             return;
         }
 
