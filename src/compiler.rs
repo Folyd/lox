@@ -787,8 +787,15 @@ impl<'gc> Parser<'gc> {
         let method_name = self.identifier_constant(self.previous.lexeme);
 
         self.named_variable("this", false);
-        self.named_variable("super", false);
-        self.emit_bytes(OpCode::GetSuper, method_name as u8);
+        if self._match(TokenType::LeftParen) {
+            let arg_count = self.argument_list();
+            self.named_variable("super", false);
+            self.emit_bytes(OpCode::SuperInvoke, method_name as u8);
+            self.emit_byte(arg_count);
+        } else {
+            self.named_variable("super", false);
+            self.emit_bytes(OpCode::GetSuper, method_name as u8);
+        }
     }
 
     fn this(&mut self, _can_assign: bool) {

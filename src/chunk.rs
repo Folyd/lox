@@ -47,6 +47,7 @@ pub enum OpCode {
     Invoke,
     Inherit,
     GetSuper,
+    SuperInvoke,
     Unknown,
 }
 
@@ -191,17 +192,10 @@ impl<'gc> Chunk<'gc> {
                 OpCode::SetProperty => return self.constant_instruction("SET_PROPERTY", offset),
                 OpCode::GetProperty => return self.constant_instruction("GET_PROPERTY", offset),
                 OpCode::Method => return self.constant_instruction("METHOD", offset),
-                OpCode::Invoke => {
-                    let constant = self.code[offset + 1];
-                    let arg_count = self.code[offset + 2];
-                    println!(
-                        "{:-16} ({} args) {} '{}'",
-                        "OP_INVOKE", arg_count, constant, self.constans[constant as usize]
-                    );
-                    return offset + 3;
-                }
+                OpCode::Invoke => return self.invoke_instruction("INVOKE", offset),
                 OpCode::Inherit => return simple_instruction("INHERIT", offset),
                 OpCode::GetSuper => return self.constant_instruction("GET_SUPER", offset),
+                OpCode::SuperInvoke => return self.invoke_instruction("SUPER_INVOKE", offset),
                 OpCode::Unknown => {}
             }
         } else {
@@ -238,6 +232,17 @@ impl<'gc> Chunk<'gc> {
         };
 
         println!("{:-16} {:4} -> {}", name, offset, jump);
+        offset + 3
+    }
+
+    fn invoke_instruction(&self, name: &str, offset: usize) -> usize {
+        let name = format!("OP_{name}");
+        let constant = self.code[offset + 1];
+        let arg_count = self.code[offset + 2];
+        println!(
+            "{:-16} ({} args) {} '{}'",
+            name, arg_count, constant, self.constans[constant as usize]
+        );
         offset + 3
     }
 }

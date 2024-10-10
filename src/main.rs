@@ -2,7 +2,6 @@ use std::{env::args, fs, process::exit};
 
 mod builtins;
 mod chunk;
-mod common;
 mod compiler;
 mod fuel;
 mod object;

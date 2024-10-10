@@ -464,6 +464,12 @@ impl<'gc> State<'gc> {
                     let superclass = self.pop_stack().as_class().unwrap();
                     self.bind_method(superclass, name);
                 }
+                OpCode::SuperInvoke => {
+                    let method_name = frame.read_string();
+                    let arg_count = frame.read_byte();
+                    let superclass = self.pop_stack().as_class().unwrap();
+                    self.invoke_from_class(superclass, method_name, arg_count);
+                }
                 OpCode::Unknown => {
                     return Err(InterpretResult::RuntimeError("Unknown opcode".into()))
                 }
