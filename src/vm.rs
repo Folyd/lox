@@ -140,7 +140,8 @@ impl Vm {
     pub fn interpret(&mut self, source: &'static str) -> Result<(), VmError> {
         self.arena.mutate_root(|mc, state| {
             let function = compile(mc, source)?;
-            // function.disassemble("script");
+            #[cfg(feature = "debug")]
+            function.disassemble("script");
             state.define_builtins();
             let closure = Gc::new(mc, Closure::new(mc, Gc::new(mc, function)));
             state.push_stack(Value::from(closure));
@@ -186,7 +187,10 @@ impl<'gc> State<'gc> {
         (0..self.frame_count).rev().for_each(|i| {
             let frame = &self.frames[i];
             let function = &frame.closure.function;
-            error_message.push_str(&format!("\n[line {}] in ", function.chunk.line(frame.ip)));
+            error_message.push_str(&format!(
+                "\n[line {}] in ",
+                function.chunk.line(frame.ip - 1)
+            ));
             let name = if function.name.is_empty() {
                 "script"
             } else {

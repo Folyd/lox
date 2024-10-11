@@ -39,7 +39,7 @@ pub struct Function<'gc> {
     pub arity: u8,
     pub chunk: Chunk<'gc>,
     pub name: Gc<'gc, String>,
-    pub upvalue_count: u8,
+    pub upvalue_count: u16,
 }
 
 impl<'gc> Display for Function<'gc> {

@@ -487,10 +487,11 @@ impl<'gc> Parser<'gc> {
         self.consume(TokenType::LeftParen, "Expect '(' after function name.");
         if !self.check(TokenType::RightParen) {
             loop {
-                self.compiler.function.arity += 1;
-                // if self.compiler.function.arity > 255 {
-                //     self.error_at_current("Can't have more than 255 parameters.");
-                // }
+                if let Some(v) = self.compiler.function.arity.checked_add(1) {
+                    self.compiler.function.arity = v;
+                } else {
+                    self.error_at_current("Can't have more than 255 parameters.");
+                }
                 let constant = self.parse_variable("Expect parameter name.");
                 self.define_variable(constant);
 
@@ -819,7 +820,13 @@ impl<'gc> Parser<'gc> {
                 return;
             }
             (pos, OpCode::GetLocal, OpCode::SetLocal)
-        } else if let Some((pos, _)) = self.compiler.resolve_upvalue(name) {
+        } else if let Some((pos, _)) = self
+            .compiler
+            .resolve_upvalue(name)
+            .inspect_err(|err| self.error(err))
+            .ok()
+            .flatten()
+        {
             (pos, OpCode::GetUpvalue, OpCode::SetUpvalue)
         } else {
             let pos = self.identifier_constant(name);
@@ -927,7 +934,7 @@ impl<'gc> Compiler<'gc> {
             .map(|i| (i, self.locals[i].depth))
     }
 
-    fn resolve_upvalue(&mut self, name: &str) -> Option<(usize, isize)> {
+    fn resolve_upvalue(&mut self, name: &str) -> Result<Option<(usize, isize)>, &'static str> {
         if let Some((index, depth)) = self
             .enclosing
             .as_mut()
@@ -938,50 +945,51 @@ impl<'gc> Compiler<'gc> {
                 // a local variable, we mark it as captured.
                 enclosing.locals[index].is_captured = true;
             }
-            let index = self.add_upvalue(index, true);
+            let index = self.add_upvalue(index, true)?;
             // println!(
             //     "resolve_upvalue: {} {name} {index}, local",
             //     self.function.name
             // );
-            return Some((index, depth));
+            return Ok(Some((index, depth)));
         } else if let Some((index, depth)) = self
             .enclosing
             .as_mut()
-            .and_then(|enclosing| enclosing.resolve_upvalue(name))
+            .and_then(|enclosing| enclosing.resolve_upvalue(name).ok())
+            .flatten()
         {
-            let index = self.add_upvalue(index, false);
+            let index = self.add_upvalue(index, false)?;
             // println!(
             //     "resolve_upvalue: {} {name} {index}, upvalue",
             //     self.function.name
             // );
-            return Some((index, depth));
+            return Ok(Some((index, depth)));
         }
 
-        None
+        Ok(None)
     }
 
-    fn add_upvalue(&mut self, index: usize, is_local: bool) -> usize {
+    fn add_upvalue(&mut self, index: usize, is_local: bool) -> Result<usize, &'static str> {
         let upvalue_index = self.function.upvalue_count as usize;
 
         // before we add a new upvalue, we first check to see if the function
-        //  already has an upvalue that closes over that variable.
+        // already has an upvalue that closes over that variable.
         if let Some(i) = self
             .upvalues
             .iter()
             .take(upvalue_index)
             .position(|u| u.index == index && u.is_local == is_local)
         {
-            return i;
+            return Ok(i);
         }
 
         if upvalue_index == MAX_LOCAL_SIZE {
-            panic!("Too many closure variables in function.");
+            return Err("Too many closure variables in function.");
         }
 
         self.upvalues[upvalue_index] = Upvalue { index, is_local };
         self.function.upvalue_count += 1;
         // println!("add upvalue to {upvalue_index} of {:?}", Upvalue { index, is_local });
-        upvalue_index
+        Ok(upvalue_index)
     }
 }
 

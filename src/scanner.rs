@@ -102,7 +102,11 @@ impl<'a> Scanner<'a> {
 
     fn advance(&mut self) -> Option<char> {
         self.current += 1;
-        // self.source[self.current - 1]
+        let len = self.source.len();
+        // Skip characters that are not valid UTF-8 characters.
+        while !self.source.is_char_boundary(self.current) && self.current < len {
+            self.current += 1;
+        }
         self.iter.next()
     }
 
@@ -115,12 +119,10 @@ impl<'a> Scanner<'a> {
             match c {
                 ' ' | '\r' | '\t' => {
                     self.advance();
-                    // break;
                 }
                 '\n' => {
                     self.line += 1;
                     self.advance();
-                    // break;
                 }
                 '/' => {
                     if &self.source[self.current..=self.current + 1] == "//" {
@@ -255,8 +257,11 @@ impl<'a> Scanner<'a> {
                     };
                 }
                 '"' => {
-                    while matches!(self.peek(), Some(c) if *c !='"') {
-                        if c == '\n' {
+                    while let Some(&ch) = self.peek() {
+                        if ch == '"' {
+                            break;
+                        }
+                        if ch == '\n' {
                             self.line += 1;
                         }
                         self.advance();
