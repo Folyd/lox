@@ -73,14 +73,10 @@ impl<'gc> Value<'gc> {
             (Value::Boolean(a), Value::Boolean(b)) => a == b,
             (Value::String(a), Value::String(b)) => a == b,
             (Value::Nil, Value::Nil) => true,
-            (Value::Class(a), Value::Class(b)) => a.borrow().name == b.borrow().name,
-            (Value::Closure(a), Value::Closure(b)) => a.function.name == b.function.name,
-            (Value::Instance(a), Value::Instance(b)) => {
-                a.borrow().class.borrow().name == b.borrow().class.borrow().name
-            }
-            (Value::BoundMethod(a), Value::BoundMethod(b)) => {
-                a.method.function.name == b.method.function.name
-            }
+            (Value::Class(a), Value::Class(b)) => Gc::ptr_eq(*a, *b),
+            (Value::Closure(a), Value::Closure(b)) => Gc::ptr_eq(*a, *b),
+            (Value::Instance(a), Value::Instance(b)) => Gc::ptr_eq(*a, *b),
+            (Value::BoundMethod(a), Value::BoundMethod(b)) => Gc::ptr_eq(*a, *b),
             _ => false,
         }
     }

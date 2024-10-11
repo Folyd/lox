@@ -523,17 +523,22 @@ impl<'gc> State<'gc> {
     }
 
     fn close_upvalues(&mut self, last: usize) {
-        while let Some(upvalue) = self.open_upvalues.take() {
-            let mut upvalue = upvalue.borrow_mut(self.mc);
-            if upvalue.location < last {
+        loop {
+            if self.open_upvalues.map(|u| u.borrow().location < last) == Some(true) {
                 break;
             }
-            let local = self.stack[upvalue.location];
-            upvalue.closed = Some(local);
-            // Dummy location after closed assigned
-            // In C's version, the location is a pointer to upvalue.closed
-            // upvalue.location = 0;
-            self.open_upvalues = upvalue.next;
+
+            if let Some(upvalue) = self.open_upvalues.take() {
+                let mut upvalue = upvalue.borrow_mut(self.mc);
+                let local = self.stack[upvalue.location];
+                upvalue.closed = Some(local);
+                // Dummy location after closed assigned
+                // In C's version, the location is a pointer to upvalue.closed
+                // upvalue.location = 0;
+                self.open_upvalues = upvalue.next;
+            } else {
+                break;
+            }
         }
     }
 
