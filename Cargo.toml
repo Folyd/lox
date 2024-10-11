@@ -1,6 +1,7 @@
 [package]
-name = "loxide"
+name = "lox-lang"
 version = "0.1.0"
+authors = ["Folyd <lyshuhow@gmail.com>"]
 edition = "2021"
 publish = false
 
@@ -12,3 +13,7 @@ ustr = "1.0.0"
 [features]
 # Enable debug features.
 debug = []
+
+[dev-dependencies]
+regex = "1.11"
+test-generator = "0.3"
