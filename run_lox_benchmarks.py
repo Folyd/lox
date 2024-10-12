@@ -1,29 +1,35 @@
 #!/bin/python3
 
-# import argparse
+import argparse
 import pathlib
 import subprocess
 import time
 
-BENCHMARK_DIR = "tests/benchmarks/lox"
+lang_list = {
+    "lox": {"interpreter": "target/release/lox-lang", "ext": "lox"},
+    "python": {"interpreter": "python3", "ext": "py"},
+    "perl": {"interpreter": "perl", "ext": "pl"},
+}
+BENCHMARK_DIR = "tests/benchmarks/{lang}"
 
 
-# parser = argparse.ArgumentParser(description="Run Lox benchmarks")
-# parser.add_argument(
-#     "lox_path",
-#     metavar="lox-path",
-#     type=str,
-#     help="Path to the Lox interpreter binary",
-#     default="target/release/lox-lang",
-# )
-# args = parser.parse_args()
-# lox = pathlib.Path(args.lox_path).resolve()
+parser = argparse.ArgumentParser(description="Run benchmarks")
+parser.add_argument(
+    "lang",
+    metavar="lang",
+    type=str,
+)
+args = parser.parse_args()
 
-lox_path = "target/release/lox-lang"
-for benchmark in sorted(pathlib.Path(BENCHMARK_DIR).glob("*.lox")):
+lang = args.lang
+interpreter = lang_list[lang]["interpreter"]
+ext = lang_list[lang]["ext"]
+
+print(f"Running benchmarks for {lang}...", BENCHMARK_DIR.format(lang=lang))
+for benchmark in sorted(pathlib.Path(BENCHMARK_DIR.format(lang=lang)).glob(f"*.{ext}")):
     times = []
     for i in range(5):
-        output = subprocess.check_output([str(lox_path), str(benchmark.resolve())])
+        output = subprocess.check_output([interpreter, str(benchmark.resolve())])
         times.append(float(output.splitlines()[-1]))
         time.sleep(2)
     print(f"{benchmark.name}: {round(min(times), 4)}")
