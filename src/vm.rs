@@ -56,7 +56,7 @@ unsafe impl<'gc> Collect for State<'gc> {
         self.frame_count.trace(cc);
         self.stack.trace(cc);
         self.stack_top.trace(cc);
-        // self.globals.trace(cc);
+        self.globals.trace(cc);
         self.open_upvalues.trace(cc);
     }
 }
@@ -652,9 +652,10 @@ impl<'gc> State<'gc> {
         if let Value::Instance(instance) = receiver {
             if let Some(value) = instance.borrow().fields.get(&name) {
                 self.stack[self.stack_top - arg_count as usize - 1] = *value;
-                return self.call_value(*value, arg_count);
+                self.call_value(*value, arg_count)
+            } else {
+                self.invoke_from_class(instance.borrow().class, name, arg_count)
             }
-            self.invoke_from_class(instance.borrow().class, name, arg_count)
         } else {
             Err(self.runtime_error("Only instances have methods.".into()))
         }

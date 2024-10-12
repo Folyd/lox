@@ -36,6 +36,9 @@ unsafe impl<'gc> Collect for Value<'gc> {
             Value::String(s) => s.trace(cc),
             Value::Function(fun) => fun.trace(cc),
             Value::Closure(closure) => closure.trace(cc),
+            Value::Class(class) => class.trace(cc),
+            Value::Instance(instance) => instance.trace(cc),
+            Value::BoundMethod(bound) => bound.trace(cc),
             _ => {}
         }
     }

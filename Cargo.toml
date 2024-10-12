@@ -17,3 +17,7 @@ debug = []
 [dev-dependencies]
 regex = "1.11"
 test-generator = "0.3"
+
+# RUSTFLAGS="-Z sanitizer=address" cargo run --release --target x86_64-apple-darwin -- test.lox
+[profile.release]
+debug = true
