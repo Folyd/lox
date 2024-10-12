@@ -1,7 +1,6 @@
 use std::fmt::Display;
 
 use gc_arena::{lock::GcRefLock, Collect, Gc};
-use ustr::Ustr;
 
 use crate::{
     object::{BoundMethod, Class, Closure, Function, Instance, NativeFn},
@@ -254,7 +253,7 @@ impl<'gc> From<Gc<'gc, BoundMethod<'gc>>> for Value<'gc> {
     }
 }
 
-#[allow(unused)]
-pub fn intern_str(s: &str) -> Ustr {
-    Ustr::from_existing(s).unwrap_or_else(|| Ustr::from(s))
-}
+// #[allow(unused)]
+// pub fn intern_str(s: &str) -> Ustr {
+//     Ustr::from_existing(s).unwrap_or_else(|| Ustr::from(s))
+// }

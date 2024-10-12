@@ -1,10 +1,12 @@
 use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
+    hash::BuildHasherDefault,
     iter,
     ops::{Deref, DerefMut},
 };
 
+use ahash::AHasher;
 use gc_arena::{
     lock::{GcRefLock, RefLock},
     Collect, Gc, Mutation,
@@ -66,14 +68,14 @@ pub enum FunctionType {
 #[collect(no_drop)]
 pub struct Class<'gc> {
     pub name: Gc<'gc, String>,
-    pub methods: HashMap<Gc<'gc, String>, Value<'gc>>,
+    pub methods: HashMap<Gc<'gc, String>, Value<'gc>, BuildHasherDefault<AHasher>>,
 }
 
 #[derive(Debug, Collect)]
 #[collect(no_drop)]
 pub struct Instance<'gc> {
     pub class: GcRefLock<'gc, Class<'gc>>,
-    pub fields: HashMap<Gc<'gc, String>, Value<'gc>>,
+    pub fields: HashMap<Gc<'gc, String>, Value<'gc>, BuildHasherDefault<AHasher>>,
 }
 
 #[derive(Debug, Collect)]
@@ -87,7 +89,7 @@ impl<'gc> Class<'gc> {
     pub fn new(name: Gc<'gc, String>) -> Self {
         Self {
             name,
-            methods: HashMap::new(),
+            methods: HashMap::default(),
         }
     }
 }
@@ -96,7 +98,7 @@ impl<'gc> Instance<'gc> {
     pub fn new(class: GcRefLock<'gc, Class<'gc>>) -> Self {
         Self {
             class,
-            fields: HashMap::new(),
+            fields: HashMap::default(),
         }
     }
 }

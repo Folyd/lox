@@ -1,6 +1,7 @@
 use core::panic;
-use std::{array, borrow::Cow, collections::HashMap};
+use std::{array, borrow::Cow, collections::HashMap, hash::BuildHasherDefault};
 
+use ahash::AHasher;
 use gc_arena::{
     lock::{GcRefLock, RefLock},
     Arena, Collect, Collection, CollectionPhase, Gc, Mutation, Rootable,
@@ -39,7 +40,7 @@ pub struct State<'gc> {
     pub frame_count: usize,
     pub stack: [Value<'gc>; STACK_MAX_SIZE],
     pub stack_top: usize,
-    pub globals: HashMap<Gc<'gc, String>, Value<'gc>>,
+    pub globals: HashMap<Gc<'gc, String>, Value<'gc>, BuildHasherDefault<AHasher>>,
     pub open_upvalues: Option<GcRefLock<'gc, UpvalueObj<'gc>>>,
 }
 
