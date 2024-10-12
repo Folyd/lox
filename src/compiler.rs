@@ -74,7 +74,7 @@ struct Upvalue {
     is_local: bool,
 }
 
-pub struct Compiler<'gc> {
+struct Compiler<'gc> {
     enclosing: Option<Box<Compiler<'gc>>>,
     function: Function<'gc>,
     fn_type: FunctionType,

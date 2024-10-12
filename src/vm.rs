@@ -33,15 +33,14 @@ pub enum VmError {
     RuntimeError(String),
 }
 
-#[derive(Clone)]
-pub struct State<'gc> {
-    pub mc: &'gc Mutation<'gc>,
-    pub frames: Vec<CallFrame<'gc>>,
-    pub frame_count: usize,
-    pub stack: [Value<'gc>; STACK_MAX_SIZE],
-    pub stack_top: usize,
-    pub globals: HashMap<Gc<'gc, String>, Value<'gc>, BuildHasherDefault<AHasher>>,
-    pub open_upvalues: Option<GcRefLock<'gc, UpvalueObj<'gc>>>,
+struct State<'gc> {
+    mc: &'gc Mutation<'gc>,
+    frames: Vec<CallFrame<'gc>>,
+    frame_count: usize,
+    stack: [Value<'gc>; STACK_MAX_SIZE],
+    stack_top: usize,
+    globals: HashMap<Gc<'gc, String>, Value<'gc>, BuildHasherDefault<AHasher>>,
+    open_upvalues: Option<GcRefLock<'gc, UpvalueObj<'gc>>>,
 }
 
 unsafe impl<'gc> Collect for State<'gc> {
@@ -68,15 +67,14 @@ pub struct Vm {
 
 #[derive(Debug, Clone, Collect)]
 #[collect(no_drop)]
-pub struct CallFrame<'gc> {
-    // pub function: Function,
-    pub closure: Gc<'gc, Closure<'gc>>,
+struct CallFrame<'gc> {
+    closure: Gc<'gc, Closure<'gc>>,
     // When we return from a function, the VM will
     // jump to the ip of the caller’s CallFrame and resume from there.
-    pub ip: usize,
+    ip: usize,
     // slot_start field points into the VM’s value stack
     // at the first slot that this function can use
-    pub slot_start: usize,
+    slot_start: usize,
 }
 
 impl<'gc> CallFrame<'gc> {
@@ -213,13 +211,14 @@ impl<'gc> State<'gc> {
     // do, and returns `Ok(true)` if no more progress can be made.
     fn step(&mut self, fuel: &mut Fuel) -> Result<bool, VmError> {
         loop {
-            // Debug stack info
-            #[cfg(feature = "debug")]
-            self.print_stack();
             let frame = self.current_frame();
-            // Disassemble instruction for debug
             #[cfg(feature = "debug")]
-            frame.disassemble_instruction(frame.ip);
+            {
+                // Debug stack info
+                self.print_stack();
+                // Disassemble instruction for debug
+                frame.disassemble_instruction(frame.ip);
+            }
             match OpCode::try_from(frame.read_byte()).unwrap() {
                 OpCode::Constant => {
                     let byte = frame.read_byte();
@@ -732,7 +731,7 @@ impl<'gc> State<'gc> {
         &self.stack[self.stack_top - 1 - distance]
     }
 
-    #[allow(unused)]
+    #[cfg(feature = "debug")]
     fn print_stack(&self) {
         print!("          ");
         for value in self.stack.iter().take(self.stack_top) {
