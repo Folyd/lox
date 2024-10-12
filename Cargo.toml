@@ -20,4 +20,6 @@ test-generator = "0.3"
 
 # RUSTFLAGS="-Z sanitizer=address" cargo run --release --target x86_64-apple-darwin -- test.lox
 [profile.release]
+codegen-units = 1
+panic = "abort"
 debug = true
