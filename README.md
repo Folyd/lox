@@ -22,6 +22,8 @@ main();
 
 ## Benchmark
 
+![](./benchmark.svg)
+
 ### Rust (this interpreter)
 
 ```

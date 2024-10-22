@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600">
+    <!-- Style definitions -->
+    <style>
+        .label { font-family: Arial; font-size: 12px; }
+        .title { font-family: Arial; font-size: 16px; font-weight: bold; }
+        .legend { font-family: Arial; font-size: 12px; }
+    </style>
+    
+    <!-- Background -->
+    <rect width="1000" height="600" fill="#f8f9fa"/>
+    
+    <!-- Title -->
+    <text x="500" y="30" text-anchor="middle" class="title">Benchmark Comparison (seconds)</text>
+    
+    <!-- Legend -->
+    <rect x="750" y="50" width="15" height="15" fill="#ff7f0e"/>
+    <text x="770" y="62" class="legend">Rust</text>
+    
+    <rect x="750" y="70" width="15" height="15" fill="#2ca02c"/>
+    <text x="770" y="82" class="legend">Python</text>
+    
+    <rect x="750" y="90" width="15" height="15" fill="#d62728"/>
+    <text x="770" y="102" class="legend">Perl</text>
+    
+    <rect x="750" y="110" width="15" height="15" fill="#1f77b4"/>
+    <text x="770" y="122" class="legend">Clox</text>
+
+    <!-- Vertical grid lines -->
+    <g fill="none" stroke="#ccc" stroke-width="0.5">
+        <line x1="200" y1="50" x2="200" y2="550"/>
+        <line x1="300" y1="50" x2="300" y2="550"/>
+        <line x1="400" y1="50" x2="400" y2="550"/>
+        <line x1="500" y1="50" x2="500" y2="550"/>
+        <line x1="600" y1="50" x2="600" y2="550"/>
+        <line x1="700" y1="50" x2="700" y2="550"/>
+    </g>
+
+    <!-- Axis labels -->
+    <text x="200" y="570" text-anchor="middle" class="label">2s</text>
+    <text x="300" y="570" text-anchor="middle" class="label">4s</text>
+    <text x="400" y="570" text-anchor="middle" class="label">6s</text>
+    <text x="500" y="570" text-anchor="middle" class="label">8s</text>
+    <text x="600" y="570" text-anchor="middle" class="label">10s</text>
+    <text x="700" y="570" text-anchor="middle" class="label">12s</text>
+
+    <!-- Data bars (scaled: 50px = 1 second) -->
+    <g transform="translate(100, 60)">
+        <!-- arithmetic -->
+        <text x="0" y="25" text-anchor="end" class="label">arithmetic</text>
+        <rect x="0" y="15" width="38.08" height="10" fill="#ff7f0e"/>
+        <rect x="0" y="25" width="130.85" height="10" fill="#2ca02c"/>
+        <rect x="0" y="35" width="61.295" height="10" fill="#d62728"/>
+        <rect x="0" y="45" width="37.45" height="10" fill="#1f77b4"/>
+
+        <!-- binary_trees -->
+        <text x="0" y="85" text-anchor="end" class="label">binary_trees</text>
+        <rect x="0" y="75" width="195.99" height="10" fill="#ff7f0e"/>
+        <rect x="0" y="85" width="125.605" height="10" fill="#2ca02c"/>
+        <rect x="0" y="95" width="357.9" height="10" fill="#d62728"/>
+        <rect x="0" y="105" width="194.53" height="10" fill="#1f77b4"/>
+
+        <!-- equality -->
+        <text x="0" y="145" text-anchor="end" class="label">equality</text>
+        <rect x="0" y="135" width="99.86" height="10" fill="#ff7f0e"/>
+        <rect x="0" y="145" width="132.86" height="10" fill="#2ca02c"/>
+        <rect x="0" y="155" width="76.175" height="10" fill="#d62728"/>
+        <rect x="0" y="165" width="100.745" height="10" fill="#1f77b4"/>
+
+        <!-- fib -->
+        <text x="0" y="205" text-anchor="end" class="label">fib</text>
+        <rect x="0" y="195" width="52.705" height="10" fill="#ff7f0e"/>
+        <rect x="0" y="205" width="68.115" height="10" fill="#2ca02c"/>
+        <rect x="0" y="215" width="235.41" height="10" fill="#d62728"/>
+        <rect x="0" y="225" width="53.27" height="10" fill="#1f77b4"/>
+
+        <!-- instantiation -->
+        <text x="0" y="265" text-anchor="end" class="label">instantiation</text>
+        <rect x="0" y="255" width="92.79" height="10" fill="#ff7f0e"/>
+        <rect x="0" y="265" width="120.155" height="10" fill="#2ca02c"/>
+        <rect x="0" y="275" width="212" height="10" fill="#d62728"/>
+        <rect x="0" y="285" width="93.505" height="10" fill="#1f77b4"/>
+
+        <!-- invocation -->
+        <text x="0" y="325" text-anchor="end" class="label">invocation</text>
+        <rect x="0" y="315" width="13.385" height="10" fill="#ff7f0e"/>
+        <rect x="0" y="325" width="28.245" height="10" fill="#2ca02c"/>
+        <rect x="0" y="335" width="49.16" height="10" fill="#d62728"/>
+        <rect x="0" y="345" width="13.53" height="10" fill="#1f77b4"/>
+
+        <!-- method_call -->
+        <text x="0" y="385" text-anchor="end" class="label">method_call</text>
+        <rect x="0" y="375" width="9.34" height="10" fill="#ff7f0e"/>
+        <rect x="0" y="385" width="13.645" height="10" fill="#2ca02c"/>
+        <rect x="0" y="395" width="55.5" height="10" fill="#d62728"/>
+        <rect x="0" y="405" width="9.415" height="10" fill="#1f77b4"/>
+
+        <!-- trees -->
+        <text x="0" y="445" text-anchor="end" class="label">trees</text>
+        <rect x="0" y="435" width="137.75" height="10" fill="#ff7f0e"/>
+        <rect x="0" y="445" width="127.695" height="10" fill="#2ca02c"/>
+        <rect x="0" y="455" width="605.005" height="10" fill="#d62728"/>
+        <rect x="0" y="465" width="134.775" height="10" fill="#1f77b4"/>
+    </g>
+</svg>
