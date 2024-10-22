@@ -6,8 +6,9 @@ edition = "2021"
 publish = false
 
 [dependencies]
-ahash = "0.8.11"
-gc-arena = { version = "0.5.3" }
+ahash = "0.8"
+gc-arena = { version = "0.5.3", features = ["allocator-api2", "hashbrown"] }
+hashbrown = { version = "0.14", features = ["raw"] }
 num_enum = "0.7.3"
 
 [features]

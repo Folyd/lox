@@ -1,5 +1,5 @@
 use core::panic;
-use std::{array, borrow::Cow, collections::HashMap, hash::BuildHasherDefault};
+use std::{array, borrow::Cow, collections::HashMap, hash::BuildHasherDefault, ops};
 
 use ahash::AHasher;
 use gc_arena::{
@@ -12,6 +12,7 @@ use crate::{
     compiler::compile,
     fuel::Fuel,
     object::{BoundMethod, Class, Closure, Instance, NativeFn, UpvalueObj},
+    string::{InternedString, InternedStringSet},
     OpCode, Value,
 };
 
@@ -27,10 +28,12 @@ macro_rules! binary_op {
     };
 }
 
+pub type Table<'gc> = HashMap<InternedString<'gc>, Value<'gc>, BuildHasherDefault<AHasher>>;
+
 #[derive(Debug)]
 pub enum VmError {
     CompileError,
-    RuntimeError(String),
+    RuntimeError(std::string::String),
 }
 
 struct State<'gc> {
@@ -39,7 +42,8 @@ struct State<'gc> {
     frame_count: usize,
     stack: [Value<'gc>; STACK_MAX_SIZE],
     stack_top: usize,
-    globals: HashMap<Gc<'gc, String>, Value<'gc>, BuildHasherDefault<AHasher>>,
+    strings: InternedStringSet<'gc>,
+    globals: Table<'gc>,
     open_upvalues: Option<GcRefLock<'gc, UpvalueObj<'gc>>>,
 }
 
@@ -56,6 +60,7 @@ unsafe impl<'gc> Collect for State<'gc> {
         self.frame_count.trace(cc);
         self.stack.trace(cc);
         self.stack_top.trace(cc);
+        self.strings.trace(cc);
         self.globals.trace(cc);
         self.open_upvalues.trace(cc);
     }
@@ -97,7 +102,7 @@ impl<'gc> CallFrame<'gc> {
         self.closure.function.read_constant(byte)
     }
 
-    fn read_string(&mut self) -> Gc<'gc, String> {
+    fn read_string(&mut self) -> InternedString<'gc> {
         let byte = self.read_byte();
         self.read_constant(byte).as_string().unwrap()
     }
@@ -106,7 +111,7 @@ impl<'gc> CallFrame<'gc> {
     fn disassemble(&self) {
         self.closure
             .function
-            .disassemble(&self.closure.function.name);
+            .disassemble(self.closure.function.name.display_lossy());
     }
 
     #[allow(unused)]
@@ -123,9 +128,18 @@ impl<'gc> State<'gc> {
             frame_count: 0,
             stack: array::from_fn(|_| Value::Nil),
             stack_top: 0,
+            strings: InternedStringSet::new(mc),
             globals: HashMap::default(),
             open_upvalues: None,
         }
+    }
+
+    pub fn intern(&mut self, s: &[u8]) -> InternedString<'gc> {
+        self.strings.intern(self.mc, s)
+    }
+
+    pub fn intern_static(&mut self, s: &'static str) -> InternedString<'gc> {
+        self.strings.intern_static(self.mc, s.as_bytes())
     }
 }
 
@@ -138,7 +152,11 @@ impl Vm {
 
     pub fn interpret(&mut self, source: &'static str) -> Result<(), VmError> {
         self.arena.mutate_root(|mc, state| {
-            let function = compile(mc, source)?;
+            let context = Context {
+                mutation: mc,
+                strings: state.strings,
+            };
+            let function = compile(context, source)?;
             #[cfg(feature = "debug")]
             function.disassemble("script");
             state.define_builtins();
@@ -193,7 +211,7 @@ impl<'gc> State<'gc> {
             let name = if function.name.is_empty() {
                 "script"
             } else {
-                &*function.name
+                function.name.to_str().unwrap()
             };
             error_message.push_str(name);
             error_message.push('\n');
@@ -232,7 +250,8 @@ impl<'gc> State<'gc> {
                     (Value::String(_), Value::String(_)) => {
                         let b = self.pop_stack().as_string()?;
                         let a = self.pop_stack().as_string()?;
-                        self.push_stack(Gc::new(self.mc, format!("{a}{b}")).into());
+                        let s = self.intern(format!("{a}{b}").as_bytes());
+                        self.push_stack(s.into());
                     }
                     _ => {
                         return Err(self
@@ -542,7 +561,7 @@ impl<'gc> State<'gc> {
         }
     }
 
-    fn define_method(&mut self, name: Gc<'gc, String>) {
+    fn define_method(&mut self, name: InternedString<'gc>) {
         let class = self.peek(1).as_class().unwrap();
         class
             .borrow_mut(self.mc)
@@ -556,17 +575,15 @@ impl<'gc> State<'gc> {
         self.define_native_function("clock", builtins::clock);
     }
 
-    fn define_native_function(&mut self, name: &str, function: NativeFn<'gc>) {
-        self.globals.insert(
-            Gc::new(self.mc, name.to_owned()),
-            Value::NativeFunction(function),
-        );
+    fn define_native_function(&mut self, name: &'static str, function: NativeFn<'gc>) {
+        let s = self.intern_static(name);
+        self.globals.insert(s, Value::NativeFunction(function));
     }
 
     fn bind_method(
         &mut self,
         class: GcRefLock<'gc, Class<'gc>>,
-        name: Gc<'gc, String>,
+        name: InternedString<'gc>,
     ) -> Result<(), VmError> {
         if let Some(method) = class.borrow().methods.get(&name) {
             let bound = BoundMethod::new(*self.peek(0), (*method).as_closure()?);
@@ -610,7 +627,7 @@ impl<'gc> State<'gc> {
                 self.stack[self.stack_top - arg_count as usize - 1] =
                     Value::from(Gc::new(self.mc, RefLock::new(instance)));
                 // FIXME: interne init string
-                let init = Gc::new(self.mc, "init".to_owned());
+                let init = self.intern_static("init");
                 if let Some(initializer) = class.borrow().methods.get(&init) {
                     return self.call(initializer.as_closure()?, arg_count);
                 } else if arg_count != 0 {
@@ -637,7 +654,7 @@ impl<'gc> State<'gc> {
     fn invoke_from_class(
         &mut self,
         class: GcRefLock<'gc, Class<'gc>>,
-        name: Gc<'gc, String>,
+        name: InternedString<'gc>,
         arg_count: u8,
     ) -> Result<(), VmError> {
         if let Some(method) = class.borrow().methods.get(&name) {
@@ -647,7 +664,7 @@ impl<'gc> State<'gc> {
         }
     }
 
-    fn invoke(&mut self, name: Gc<'gc, String>, arg_count: u8) -> Result<(), VmError> {
+    fn invoke(&mut self, name: InternedString<'gc>, arg_count: u8) -> Result<(), VmError> {
         let receiver = self.peek(arg_count as usize);
         if let Value::Instance(instance) = receiver {
             if let Some(value) = instance.borrow().fields.get(&name) {
@@ -740,5 +757,32 @@ impl<'gc> State<'gc> {
             print!(" ]")
         }
         println!();
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct Context<'gc> {
+    mutation: &'gc Mutation<'gc>,
+    strings: InternedStringSet<'gc>,
+}
+
+impl<'gc> Context<'gc> {
+    /// Calls `ctx.interned_strings().intern(&ctx, s)`.
+    pub fn intern(self, s: &[u8]) -> InternedString<'gc> {
+        self.strings.intern(&self, s)
+    }
+
+    /// Calls `ctx.interned_strings().intern_static(&ctx, s)`.
+    #[allow(unused)]
+    pub fn intern_static(self, s: &'static str) -> InternedString<'gc> {
+        self.strings.intern_static(&self, s.as_bytes())
+    }
+}
+
+impl<'gc> ops::Deref for Context<'gc> {
+    type Target = Mutation<'gc>;
+
+    fn deref(&self) -> &Self::Target {
+        self.mutation
     }
 }

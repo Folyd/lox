@@ -4,10 +4,10 @@ use std::{array, mem, ops::Add};
 use crate::{
     object::{Function, FunctionType},
     scanner::{Scanner, Token, TokenType},
-    vm::VmError,
+    vm::{Context, VmError},
     OpCode, Value,
 };
-use gc_arena::{Gc, Mutation};
+use gc_arena::Gc;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 const MAX_LOCAL_SIZE: usize = u8::MAX as usize + 1;
@@ -16,7 +16,7 @@ const UNINITIALIZED_LOCAL_DEPTH: isize = -1;
 type ParseFn<'gc> = fn(&mut Parser<'gc>, bool /*can assign*/);
 
 struct Parser<'gc> {
-    mutation: &'gc Mutation<'gc>,
+    ctx: Context<'gc>,
     compiler: Box<Compiler<'gc>>,
     class_compiler: Option<Box<ClassCompiler>>,
     scanner: Scanner<'gc>,
@@ -91,11 +91,11 @@ struct ClassCompiler {
 }
 
 impl<'gc> Parser<'gc> {
-    fn new(mutation: &'gc Mutation<'gc>, source: &'gc str) -> Self {
+    fn new(ctx: Context<'gc>, source: &'static str) -> Self {
         Parser {
+            ctx,
             // Let the default top level <script> function name to empty.
-            mutation,
-            compiler: Compiler::new(mutation, FunctionType::Script, ""),
+            compiler: Compiler::new(ctx, FunctionType::Script, ""),
             class_compiler: None,
             scanner: Scanner::new(source),
             current: Token::default(),
@@ -239,7 +239,8 @@ impl<'gc> Parser<'gc> {
     }
 
     fn identifier_constant(&mut self, identifier: &str) -> usize {
-        self.make_constant(Value::from(Gc::new(self.mutation, identifier.to_owned())))
+        let s = self.ctx.intern(identifier.as_bytes());
+        self.make_constant(Value::from(s))
     }
 
     fn add_local(&mut self, name: Token<'gc>) {
@@ -508,7 +509,7 @@ impl<'gc> Parser<'gc> {
         // self.compiler already became set to enclosing compiler
         let compiler = self.pop_compiler();
         let upvalue_count = compiler.function.upvalue_count;
-        let constant = self.make_constant(Value::from(Gc::new(self.mutation, compiler.function)));
+        let constant = self.make_constant(Value::from(Gc::new(&self.ctx, compiler.function)));
         self.emit_bytes(OpCode::Closure, constant as u8);
 
         for i in 0..upvalue_count {
@@ -603,7 +604,7 @@ impl<'gc> Parser<'gc> {
     fn push_compiler(&mut self, fn_type: FunctionType) {
         // grab the function name from the previous token
         let function_name = self.previous.lexeme;
-        let compiler = Compiler::new(self.mutation, fn_type, function_name);
+        let compiler = Compiler::new(self.ctx, fn_type, function_name);
         let enclosing_compiler = mem::replace(&mut self.compiler, compiler);
         self.compiler.enclosing = Some(enclosing_compiler);
     }
@@ -708,7 +709,7 @@ impl<'gc> Parser<'gc> {
 
     fn string(&mut self, _can_assign: bool) {
         let string = self.previous.lexeme.trim_matches('"');
-        self.emit_constant(Gc::new(self.mutation, string.to_owned()).into());
+        self.emit_constant(Value::from(self.ctx.intern(string.as_bytes())));
     }
 
     fn number(&mut self, _can_assign: bool) {
@@ -888,10 +889,10 @@ impl<'gc> Parser<'gc> {
 }
 
 impl<'gc> Compiler<'gc> {
-    pub fn new(mc: &'gc Mutation<'gc>, fn_type: FunctionType, name: &str) -> Box<Self> {
+    pub fn new(ctx: Context<'gc>, fn_type: FunctionType, name: &str) -> Box<Self> {
         Box::new(Compiler {
             enclosing: None,
-            function: Function::new(mc, name, 0),
+            function: Function::new(ctx.intern(name.as_bytes()), 0),
             fn_type,
             locals: array::from_fn(|i| {
                 // Remember that the compiler’s locals array keeps track of which stack slots
@@ -1042,11 +1043,8 @@ impl<'gc> ParseRule<'gc> {
     }
 }
 
-pub fn compile<'gc>(
-    mutation: &'gc Mutation<'gc>,
-    source: &'gc str,
-) -> Result<Function<'gc>, VmError> {
-    let mut parser = Parser::new(mutation, source);
+pub fn compile<'gc>(ctx: Context<'gc>, source: &'static str) -> Result<Function<'gc>, VmError> {
+    let mut parser = Parser::new(ctx, source);
     parser.compile()?;
     Ok(parser.compiler.function)
 }

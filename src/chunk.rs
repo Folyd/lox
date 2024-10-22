@@ -1,6 +1,5 @@
 use std::{
-    ops::{Index, IndexMut},
-    sync::Once,
+    fmt::Display, ops::{Index, IndexMut}, sync::Once
 };
 
 use gc_arena::Collect;
@@ -115,7 +114,7 @@ impl<'gc> Chunk<'gc> {
         self.constans[byte as usize]
     }
 
-    pub fn disassemble(&self, name: &str) {
+    pub fn disassemble(&self, name: impl Display) {
         println!("\n== {name} ==>");
         let mut offset = 0;
         while offset < self.code.len() {
