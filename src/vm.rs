@@ -151,12 +151,12 @@ impl Vm {
         })?;
 
         loop {
-            const FUEL_PER_GC: i32 = 4096;
+            const FUEL_PER_GC: i32 = 1024 * 10;
             let mut fuel = Fuel::new(FUEL_PER_GC);
             // periodically exit the arena in order to collect garbage concurrently with running the VM.
             let result = self.arena.mutate_root(|_, state| state.step(&mut fuel));
 
-            const COLLECTOR_GRANULARITY: f64 = 1024.0;
+            const COLLECTOR_GRANULARITY: f64 = 10240.0;
             if self.arena.metrics().allocation_debt() > COLLECTOR_GRANULARITY {
                 // Do garbage collection.
                 #[cfg(feature = "debug")]
@@ -470,7 +470,7 @@ impl<'gc> State<'gc> {
                 OpCode::Unknown => return Err(self.runtime_error("Unknown opcode.".into())),
             }
 
-            const FUEL_PER_STEP: i32 = 4;
+            const FUEL_PER_STEP: i32 = 1;
             fuel.consume(FUEL_PER_STEP);
 
             if !fuel.should_continue() {

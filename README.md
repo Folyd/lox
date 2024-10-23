@@ -29,16 +29,16 @@ main();
 ```
 $ python3 run_lox_benchmarks.py lox 
 Running benchmarks for lox... tests/benchmarks/lox
-arithmetic.lox: 3.0373
-binary_trees.lox: 6.8052
-equality.lox: 3.7999
-fib.lox: 2.2638
-instantiation.lox: 3.8646
-invocation.lox: 0.8515
-method_call.lox: 0.5475
-properties.lox: 1.2341
-trees.lox: 9.2888
-zoo.lox: 0.983
+arithmetic.lox: 2.8146
+binary_trees.lox: 6.4399
+equality.lox: 3.6683
+fib.lox: 2.1664
+instantiation.lox: 2.7269
+invocation.lox: 0.8192
+method_call.lox: 0.5381
+properties.lox: 1.1997
+trees.lox: 9.0106
+zoo.lox: 0.927
 ```
 
 ### Python v3.12.3
