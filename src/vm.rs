@@ -1,4 +1,3 @@
-use core::panic;
 use std::{array, borrow::Cow, collections::HashMap, hash::BuildHasherDefault, ops};
 
 use ahash::AHasher;
@@ -767,12 +766,10 @@ pub struct Context<'gc> {
 }
 
 impl<'gc> Context<'gc> {
-    /// Calls `ctx.interned_strings().intern(&ctx, s)`.
     pub fn intern(self, s: &[u8]) -> InternedString<'gc> {
         self.strings.intern(&self, s)
     }
 
-    /// Calls `ctx.interned_strings().intern_static(&ctx, s)`.
     #[allow(unused)]
     pub fn intern_static(self, s: &'static str) -> InternedString<'gc> {
         self.strings.intern_static(&self, s.as_bytes())
