@@ -85,13 +85,15 @@ impl<'gc> Default for Chunk<'gc> {
 impl<'gc> Index<usize> for Chunk<'gc> {
     type Output = OpCode;
     fn index(&self, index: usize) -> &Self::Output {
-        &self.code[index]
+        // &self.code[index]
+        unsafe { self.code.get_unchecked(index) }
     }
 }
 
 impl<'gc> IndexMut<usize> for Chunk<'gc> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.code[index]
+        // &mut self.code[index]
+        unsafe { self.code.get_unchecked_mut(index) }
     }
 }
 
@@ -128,8 +130,10 @@ impl<'gc> Chunk<'gc> {
         self.constans.len() - 1
     }
 
+    #[inline]
     pub fn read_constant(&self, byte: u8) -> Value<'gc> {
-        self.constans[byte as usize]
+        // self.constans[byte as usize]
+        unsafe { *self.constans.get_unchecked(byte as usize) }
     }
 
     pub fn disassemble(&self, name: impl Display) {

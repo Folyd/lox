@@ -69,11 +69,12 @@ impl<'gc> Display for Value<'gc> {
 }
 
 impl<'gc> Value<'gc> {
+    #[inline]
     pub fn equals(&self, other: &Value<'gc>) -> bool {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => a == b,
             (Value::Boolean(a), Value::Boolean(b)) => a == b,
-            (Value::String(a), Value::String(b)) => a == b,
+            (Value::String(a), Value::String(b)) => a.equals(b),
             (Value::Nil, Value::Nil) => true,
             (Value::Class(a), Value::Class(b)) => Gc::ptr_eq(*a, *b),
             (Value::Closure(a), Value::Closure(b)) => Gc::ptr_eq(*a, *b),

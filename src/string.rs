@@ -181,6 +181,11 @@ impl<'gc> fmt::Debug for InternedString<'gc> {
 }
 
 impl<'gc> InternedString<'gc> {
+    #[inline]
+    pub fn equals(self, other: &InternedString<'gc>) -> bool {
+        self.stored_hash() == other.stored_hash() && self.as_bytes() == other.as_bytes()
+    }
+
     pub fn len(self) -> i64 {
         self.as_bytes().len().try_into().unwrap()
     }

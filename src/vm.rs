@@ -687,11 +687,13 @@ impl<'gc> State<'gc> {
         unsafe { *self.stack.get_unchecked_mut(index) = value }
     }
 
+    #[inline]
     fn push_stack(&mut self, value: Value<'gc>) {
         self.stack_set(self.stack_top, value);
         self.stack_top += 1;
     }
 
+    #[inline]
     fn pop_stack(&mut self) -> Value<'gc> {
         self.stack_top -= 1;
         self.stack_get(self.stack_top)
@@ -718,6 +720,7 @@ impl<'gc> State<'gc> {
         result
     }
 
+    #[inline]
     fn peek(&self, distance: usize) -> &Value<'gc> {
         &self.stack[self.stack_top - 1 - distance]
     }
