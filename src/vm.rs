@@ -123,7 +123,7 @@ impl<'gc> State<'gc> {
     fn new(mc: &'gc Mutation<'gc>) -> Self {
         State {
             mc,
-            frames: Vec::new(),
+            frames: Vec::with_capacity(FRAME_MAX_SIZE),
             frame_count: 0,
             stack: array::from_fn(|_| Value::Nil),
             stack_top: 0,
@@ -703,23 +703,24 @@ impl<'gc> State<'gc> {
         Ok(())
     }
 
+    #[inline]
+    fn stack_get(&mut self, index: usize) -> Value<'gc> {
+        unsafe { *self.stack.get_unchecked(index) }
+    }
+
+    #[inline]
+    fn stack_set(&mut self, index: usize, value: Value<'gc>) {
+        unsafe { *self.stack.get_unchecked_mut(index) = value }
+    }
+
     fn push_stack(&mut self, value: Value<'gc>) {
-        if self.stack_top < STACK_MAX_SIZE {
-            self.stack[self.stack_top] = value;
-            self.stack_top += 1;
-        } else {
-            panic!("Stack overflow");
-        }
+        self.stack_set(self.stack_top, value);
+        self.stack_top += 1;
     }
 
     fn pop_stack(&mut self) -> Value<'gc> {
-        if self.stack_top > 0 {
-            self.stack_top -= 1;
-            self.stack[self.stack_top]
-        } else {
-            // panic!("Stack underflow")
-            Value::Nil
-        }
+        self.stack_top -= 1;
+        self.stack_get(self.stack_top)
     }
 
     fn pop_stack_n(&mut self, n: usize) -> Vec<Value<'gc>> {
