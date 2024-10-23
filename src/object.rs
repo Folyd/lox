@@ -41,7 +41,16 @@ pub struct Function<'gc> {
     pub arity: u8,
     pub chunk: Chunk<'gc>,
     pub name: InternedString<'gc>,
-    pub upvalue_count: u16,
+    pub upvalues: Vec<Upvalue>,
+}
+
+#[derive(Debug, Clone, Copy, Collect)]
+#[collect(require_static)]
+pub struct Upvalue {
+    pub index: usize,
+    // that flag controls whether the closure captures a local
+    // variable or an upvalue from the surrounding function.
+    pub is_local: bool,
 }
 
 impl<'gc> Display for Function<'gc> {
@@ -122,7 +131,7 @@ impl<'gc> UpvalueObj<'gc> {
 impl<'gc> Closure<'gc> {
     pub fn new(mc: &'gc Mutation<'gc>, function: Gc<'gc, Function<'gc>>) -> Self {
         let upvalues = iter::repeat_with(|| Gc::new(mc, RefLock::new(UpvalueObj::default())))
-            .take(function.upvalue_count as usize)
+            .take(function.upvalues.len())
             .collect::<Vec<_>>()
             .into_boxed_slice();
         Self { function, upvalues }
@@ -135,7 +144,7 @@ impl<'gc> Function<'gc> {
             arity,
             chunk: Chunk::new(),
             name,
-            upvalue_count: 0,
+            upvalues: Vec::new(),
         }
     }
 }

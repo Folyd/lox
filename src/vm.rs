@@ -10,7 +10,7 @@ use crate::{
     builtins,
     compiler::compile,
     fuel::Fuel,
-    object::{BoundMethod, Class, Closure, Instance, NativeFn, UpvalueObj},
+    object::{BoundMethod, Class, Closure, Instance, NativeFn, Upvalue, UpvalueObj},
     string::{InternedString, InternedStringSet},
     OpCode, Value,
 };
@@ -82,28 +82,14 @@ struct CallFrame<'gc> {
 }
 
 impl<'gc> CallFrame<'gc> {
-    fn read_byte(&mut self) -> u8 {
+    fn next_opcode(&mut self) -> OpCode {
         let byte = self.closure.function[self.ip];
         self.ip += 1;
         byte
     }
 
-    fn read_short(&mut self) -> u16 {
-        let short = u16::from_be_bytes([
-            self.closure.function[self.ip],
-            self.closure.function[self.ip + 1],
-        ]);
-        self.ip += 2;
-        short
-    }
-
     fn read_constant(&mut self, byte: u8) -> Value<'gc> {
         self.closure.function.read_constant(byte)
-    }
-
-    fn read_string(&mut self) -> InternedString<'gc> {
-        let byte = self.read_byte();
-        self.read_constant(byte).as_string().unwrap()
     }
 
     #[allow(unused)]
@@ -228,17 +214,16 @@ impl<'gc> State<'gc> {
     // do, and returns `Ok(true)` if no more progress can be made.
     fn step(&mut self, fuel: &mut Fuel) -> Result<bool, VmError> {
         loop {
-            let frame = self.current_frame();
+            // Debug stack info
             #[cfg(feature = "debug")]
-            {
-                // Debug stack info
-                self.print_stack();
-                // Disassemble instruction for debug
-                frame.disassemble_instruction(frame.ip);
-            }
-            match OpCode::try_from(frame.read_byte()).unwrap() {
-                OpCode::Constant => {
-                    let byte = frame.read_byte();
+            self.print_stack();
+            let frame = self.current_frame();
+            // Disassemble instruction for debug
+            #[cfg(feature = "debug")]
+            frame.disassemble_instruction(frame.ip);
+            match frame.next_opcode() {
+                OpCode::Constant(byte) => {
+                    // let byte = frame.read_byte();
                     let constant = frame.read_constant(byte);
                     self.push_stack(constant);
                 }
@@ -312,14 +297,12 @@ impl<'gc> State<'gc> {
                 OpCode::Pop => {
                     self.pop_stack();
                 }
-                OpCode::DefineGlobal => {
-                    let byte = frame.read_byte();
+                OpCode::DefineGlobal(byte) => {
                     let varible_name = frame.read_constant(byte).as_string()?;
                     self.globals.insert(varible_name, *self.peek(0));
                     self.pop_stack();
                 }
-                OpCode::GetGlobal => {
-                    let byte = frame.read_byte();
+                OpCode::GetGlobal(byte) => {
                     let varible_name = frame.read_constant(byte).as_string()?;
                     if let Some(value) = self.globals.get(&varible_name) {
                         self.push_stack(*value);
@@ -329,8 +312,7 @@ impl<'gc> State<'gc> {
                         ));
                     }
                 }
-                OpCode::SetGlobal => {
-                    let byte = frame.read_byte();
+                OpCode::SetGlobal(byte) => {
                     let varible_name = frame.read_constant(byte).as_string()?;
                     #[allow(clippy::map_entry)]
                     if self.globals.contains_key(&varible_name) {
@@ -341,66 +323,61 @@ impl<'gc> State<'gc> {
                         ));
                     }
                 }
-                OpCode::GetLocal => {
-                    let slot = frame.read_byte();
+                OpCode::GetLocal(slot) => {
                     let value = self.stack[frame.slot_start + slot as usize];
                     self.push_stack(value);
                 }
-                OpCode::SetLocal => {
-                    let slot = frame.read_byte();
+                OpCode::SetLocal(slot) => {
                     let slot_start = frame.slot_start;
                     self.stack[slot_start + slot as usize] = *self.peek(0);
                 }
-                OpCode::JumpIfFalse => {
+                OpCode::JumpIfFalse(offset) => {
                     let is_falsy = self.peek(0).is_falsy();
                     let frame = self.current_frame();
                     // Alwasy jump to the next instruction, do not move this line into if block
-                    let offset = frame.read_short();
                     if is_falsy {
                         frame.ip += offset as usize;
                     }
                 }
-                OpCode::Jump => {
-                    let offset = frame.read_short();
+                OpCode::Jump(offset) => {
                     frame.ip += offset as usize;
                 }
-                OpCode::Loop => {
-                    let offset = frame.read_short();
+                OpCode::Loop(offset) => {
                     frame.ip -= offset as usize;
                 }
-                OpCode::Call => {
-                    let arg_count = frame.read_byte();
+                OpCode::Call(arg_count) => {
                     self.call_value(*self.peek(arg_count as usize), arg_count)?;
                 }
-                OpCode::Closure => {
-                    // frame.disassemble();
-                    let byte = frame.read_byte();
+                OpCode::Closure(byte) => {
                     let function = frame.read_constant(byte).as_function()?;
-                    // let fn_name = function.name;
                     let mut closure = Closure::new(self.mc, function);
 
-                    (0..closure.function.upvalue_count as usize).for_each(|i| {
-                        let frame = self.current_frame();
-                        let is_local = frame.read_byte();
-                        let index = frame.read_byte() as usize;
-                        if is_local == 1 {
-                            let slot = frame.slot_start + index;
-                            let upvalue = self.capture_upvalue(slot);
-                            // println!("function {} capture local: {slot}, {:?}", fn_name, upvalue);
-                            closure.upvalues[i] = upvalue;
-                        } else {
-                            // println!(
-                            //     "function {} capture upvalue: {index} {:?}",
-                            //     fn_name, &frame.closure.upvalues[index]
-                            // );
-                            closure.upvalues[i] = frame.closure.upvalues[index];
-                        }
-                    });
+                    closure
+                        .function
+                        .upvalues
+                        .iter()
+                        .enumerate()
+                        .for_each(|(i, upvalue)| {
+                            let frame = self.current_frame();
+                            let Upvalue { is_local, index } = *upvalue;
+                            if is_local {
+                                let slot = frame.slot_start + index;
+                                let upvalue = self.capture_upvalue(slot);
+                                // println!("function {} capture local: {slot}, {:?}", fn_name, upvalue);
+                                closure.upvalues[i] = upvalue;
+                            } else {
+                                // println!(
+                                //     "function {} capture upvalue: {index} {:?}",
+                                //     fn_name, &frame.closure.upvalues[index]
+                                // );
+                                closure.upvalues[i] = frame.closure.upvalues[index];
+                            }
+                        });
 
                     self.push_stack(Value::from(Gc::new(self.mc, closure)));
                 }
-                OpCode::GetUpvalue => {
-                    let slot = frame.read_byte() as usize;
+                OpCode::GetUpvalue(slot) => {
+                    let slot = slot as usize;
                     let upvalue = frame.closure.upvalues[slot];
                     if let Some(closed) = upvalue.borrow().closed {
                         self.push_stack(closed);
@@ -410,8 +387,8 @@ impl<'gc> State<'gc> {
                         self.push_stack(upvalue);
                     }
                 }
-                OpCode::SetUpvalue => {
-                    let slot = frame.read_byte() as usize;
+                OpCode::SetUpvalue(slot) => {
+                    let slot = slot as usize;
                     let mut upvalue = frame.closure.upvalues[slot].borrow_mut(self.mc);
                     let stack_position = upvalue.location;
                     upvalue.location = slot;
@@ -425,17 +402,17 @@ impl<'gc> State<'gc> {
                     self.close_upvalues(self.stack_top - 1);
                     self.pop_stack();
                 }
-                OpCode::Class => {
-                    let name = frame.read_string();
+                OpCode::Class(byte) => {
+                    let name = frame.read_constant(byte).as_string().unwrap();
                     self.push_stack(Value::from(Gc::new(
                         self.mc,
                         RefLock::new(Class::new(name)),
                     )));
                 }
-                OpCode::GetProperty => {
+                OpCode::GetProperty(byte) => {
                     if let Ok(instance) = self.peek(0).as_instance() {
                         let frame = self.current_frame();
-                        let name = frame.read_string();
+                        let name = frame.read_constant(byte).as_string().unwrap();
                         if let Some(property) = instance.borrow().fields.get(&name) {
                             self.pop_stack(); // Instance
                             self.push_stack(*property);
@@ -446,11 +423,11 @@ impl<'gc> State<'gc> {
                         return Err(self.runtime_error("Only instances have properties.".into()));
                     }
                 }
-                OpCode::SetProperty => {
+                OpCode::SetProperty(byte) => {
                     if let Ok(instantce) = self.peek(1).as_instance() {
                         let value = *self.peek(0);
                         let frame = self.current_frame();
-                        let name = frame.read_string();
+                        let name = frame.read_constant(byte).as_string().unwrap();
                         instantce.borrow_mut(self.mc).fields.insert(name, value);
 
                         let value = self.pop_stack(); // Value
@@ -460,13 +437,12 @@ impl<'gc> State<'gc> {
                         return Err(self.runtime_error("Only instances have fields.".into()));
                     }
                 }
-                OpCode::Method => {
-                    let name = frame.read_string();
+                OpCode::Method(byte) => {
+                    let name = frame.read_constant(byte).as_string().unwrap();
                     self.define_method(name);
                 }
-                OpCode::Invoke => {
-                    let method_name = frame.read_string();
-                    let arg_count = frame.read_byte();
+                OpCode::Invoke(byte, arg_count) => {
+                    let method_name = frame.read_constant(byte).as_string().unwrap();
                     self.invoke(method_name, arg_count)?;
                 }
                 OpCode::Inherit => {
@@ -481,14 +457,13 @@ impl<'gc> State<'gc> {
                         return Err(self.runtime_error("Superclass must be a class.".into()));
                     }
                 }
-                OpCode::GetSuper => {
-                    let name = frame.read_string();
+                OpCode::GetSuper(byte) => {
+                    let name = frame.read_constant(byte).as_string().unwrap();
                     let superclass = self.pop_stack().as_class()?;
                     self.bind_method(superclass, name)?
                 }
-                OpCode::SuperInvoke => {
-                    let method_name = frame.read_string();
-                    let arg_count = frame.read_byte();
+                OpCode::SuperInvoke(byte, arg_count) => {
+                    let method_name = frame.read_constant(byte).as_string().unwrap();
                     let superclass = self.pop_stack().as_class()?;
                     self.invoke_from_class(superclass, method_name, arg_count)?;
                 }
@@ -625,7 +600,6 @@ impl<'gc> State<'gc> {
                 let instance = Instance::new(class);
                 self.stack[self.stack_top - arg_count as usize - 1] =
                     Value::from(Gc::new(self.mc, RefLock::new(instance)));
-                // FIXME: interne init string
                 let init = self.intern_static("init");
                 if let Some(initializer) = class.borrow().methods.get(&init) {
                     return self.call(initializer.as_closure()?, arg_count);
@@ -635,7 +609,7 @@ impl<'gc> State<'gc> {
                     ));
                 }
             }
-            Value::Function(_) => {} //self.call(*function, arg_count),
+            Value::Function(_) => {}
             Value::Closure(closure) => return self.call(closure, arg_count),
             Value::NativeFunction(function) => {
                 let result = function(self.pop_stack_n(arg_count as usize));
