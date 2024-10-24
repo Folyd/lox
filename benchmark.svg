@@ -1,104 +1,183 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600">
-    <!-- Style definitions -->
-    <style>
-        .label { font-family: Arial; font-size: 12px; }
-        .title { font-family: Arial; font-size: 16px; font-weight: bold; }
-        .legend { font-family: Arial; font-size: 12px; }
-    </style>
-    
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
     <!-- Background -->
-    <rect width="1000" height="600" fill="#f8f9fa"/>
+    <rect width="800" height="800" fill="#f8f9fa"/>
     
     <!-- Title -->
-    <text x="500" y="30" text-anchor="middle" class="title">Benchmark Comparison (seconds)</text>
+    <text x="400" y="40" text-anchor="middle" font-size="20" font-weight="bold" font-family="Arial">Benchmark Comparison (seconds)</text>
     
     <!-- Legend -->
-    <rect x="750" y="50" width="15" height="15" fill="#ff7f0e"/>
-    <text x="770" y="62" class="legend">Rust</text>
-    
-    <rect x="750" y="70" width="15" height="15" fill="#2ca02c"/>
-    <text x="770" y="82" class="legend">Python</text>
-    
-    <rect x="750" y="90" width="15" height="15" fill="#d62728"/>
-    <text x="770" y="102" class="legend">Perl</text>
-    
-    <rect x="750" y="110" width="15" height="15" fill="#1f77b4"/>
-    <text x="770" y="122" class="legend">Clox</text>
-
-    <!-- Vertical grid lines -->
-    <g fill="none" stroke="#ccc" stroke-width="0.5">
-        <line x1="200" y1="50" x2="200" y2="550"/>
-        <line x1="300" y1="50" x2="300" y2="550"/>
-        <line x1="400" y1="50" x2="400" y2="550"/>
-        <line x1="500" y1="50" x2="500" y2="550"/>
-        <line x1="600" y1="50" x2="600" y2="550"/>
-        <line x1="700" y1="50" x2="700" y2="550"/>
+    <g transform="translate(650, 80)">
+        <rect width="15" height="15" fill="#ff6b6b"/>
+        <text x="25" y="12" font-family="Arial" font-size="12">Rust</text>
+        
+        <rect y="25" width="15" height="15" fill="#4ecdc4"/>
+        <text x="25" y="37" font-family="Arial" font-size="12">Python</text>
+        
+        <rect y="50" width="15" height="15" fill="#45b7d1"/>
+        <text x="25" y="62" font-family="Arial" font-size="12">Perl</text>
+        
+        <rect y="75" width="15" height="15" fill="#96ceb4"/>
+        <text x="25" y="87" font-family="Arial" font-size="12">Clox</text>
     </g>
 
-    <!-- Axis labels -->
-    <text x="200" y="570" text-anchor="middle" class="label">2s</text>
-    <text x="300" y="570" text-anchor="middle" class="label">4s</text>
-    <text x="400" y="570" text-anchor="middle" class="label">6s</text>
-    <text x="500" y="570" text-anchor="middle" class="label">8s</text>
-    <text x="600" y="570" text-anchor="middle" class="label">10s</text>
-    <text x="700" y="570" text-anchor="middle" class="label">12s</text>
+    <!-- Chart Area -->
+    <g transform="translate(150, 80)">
+        <!-- Y-axis labels -->
+        <text x="-10" y="35" text-anchor="end" font-family="Arial" font-size="12">arithmetic</text>
+        <text x="-10" y="115" text-anchor="end" font-family="Arial" font-size="12">binary_trees</text>
+        <text x="-10" y="195" text-anchor="end" font-family="Arial" font-size="12">equality</text>
+        <text x="-10" y="275" text-anchor="end" font-family="Arial" font-size="12">fib</text>
+        <text x="-10" y="355" text-anchor="end" font-family="Arial" font-size="12">instantiation</text>
+        <text x="-10" y="435" text-anchor="end" font-family="Arial" font-size="12">invocation</text>
+        <text x="-10" y="515" text-anchor="end" font-family="Arial" font-size="12">method_call</text>
+        <text x="-10" y="595" text-anchor="end" font-family="Arial" font-size="12">properties</text>
+        <text x="-10" y="675" text-anchor="end" font-family="Arial" font-size="12">trees</text>
+        <text x="-10" y="755" text-anchor="end" font-family="Arial" font-size="12">zoo</text>
 
-    <!-- Data bars (scaled: 50px = 1 second) -->
-    <g transform="translate(100, 60)">
+        <!-- X-axis -->
+        <line x1="0" y1="0" x2="600" y2="0" stroke="#333" stroke-width="1"/>
+        <line x1="0" y1="780" x2="600" y2="780" stroke="#333" stroke-width="1"/>
+        
+        <!-- X-axis labels -->
+        <g transform="translate(0, 795)">
+            <text x="0" text-anchor="middle" font-family="Arial" font-size="10">0s</text>
+            <text x="100" text-anchor="middle" font-family="Arial" font-size="10">2s</text>
+            <text x="200" text-anchor="middle" font-family="Arial" font-size="10">4s</text>
+            <text x="300" text-anchor="middle" font-family="Arial" font-size="10">6s</text>
+            <text x="400" text-anchor="middle" font-family="Arial" font-size="10">8s</text>
+            <text x="500" text-anchor="middle" font-family="Arial" font-size="10">10s</text>
+            <text x="600" text-anchor="middle" font-family="Arial" font-size="10">12s</text>
+        </g>
+
+        <!-- Grid lines -->
+        <g stroke="#eee" stroke-width="1">
+            <line x1="100" y1="0" x2="100" y2="780"/>
+            <line x1="200" y1="0" x2="200" y2="780"/>
+            <line x1="300" y1="0" x2="300" y2="780"/>
+            <line x1="400" y1="0" x2="400" y2="780"/>
+            <line x1="500" y1="0" x2="500" y2="780"/>
+            <line x1="600" y1="0" x2="600" y2="780"/>
+        </g>
+
+        <!-- Bars -->
         <!-- arithmetic -->
-        <text x="0" y="25" text-anchor="end" class="label">arithmetic</text>
-        <rect x="0" y="15" width="38.08" height="10" fill="#ff7f0e"/>
-        <rect x="0" y="25" width="130.85" height="10" fill="#2ca02c"/>
-        <rect x="0" y="35" width="61.295" height="10" fill="#d62728"/>
-        <rect x="0" y="45" width="37.45" height="10" fill="#1f77b4"/>
+        <g>
+            <rect x="0" y="10" width="140.73" height="12" fill="#ff6b6b"/>
+            <text x="145.73" y="20" font-family="Arial" font-size="10">2.81s</text>
+            <rect x="0" y="25" width="130.85" height="12" fill="#4ecdc4"/>
+            <text x="135.85" y="35" font-family="Arial" font-size="10">2.62s</text>
+            <rect x="0" y="40" width="61.295" height="12" fill="#45b7d1"/>
+            <text x="66.295" y="50" font-family="Arial" font-size="10">1.23s</text>
+            <rect x="0" y="55" width="37.45" height="12" fill="#96ceb4"/>
+            <text x="42.45" y="65" font-family="Arial" font-size="10">0.75s</text>
+        </g>
 
         <!-- binary_trees -->
-        <text x="0" y="85" text-anchor="end" class="label">binary_trees</text>
-        <rect x="0" y="75" width="195.99" height="10" fill="#ff7f0e"/>
-        <rect x="0" y="85" width="125.605" height="10" fill="#2ca02c"/>
-        <rect x="0" y="95" width="357.9" height="10" fill="#d62728"/>
-        <rect x="0" y="105" width="194.53" height="10" fill="#1f77b4"/>
+        <g>
+            <rect x="0" y="90" width="322" height="12" fill="#ff6b6b"/>
+            <text x="327" y="100" font-family="Arial" font-size="10">6.44s</text>
+            <rect x="0" y="105" width="125.605" height="12" fill="#4ecdc4"/>
+            <text x="130.605" y="115" font-family="Arial" font-size="10">2.51s</text>
+            <rect x="0" y="120" width="357.9" height="12" fill="#45b7d1"/>
+            <text x="362.9" y="130" font-family="Arial" font-size="10">7.16s</text>
+            <rect x="0" y="135" width="194.53" height="12" fill="#96ceb4"/>
+            <text x="199.53" y="145" font-family="Arial" font-size="10">3.89s</text>
+        </g>
 
         <!-- equality -->
-        <text x="0" y="145" text-anchor="end" class="label">equality</text>
-        <rect x="0" y="135" width="99.86" height="10" fill="#ff7f0e"/>
-        <rect x="0" y="145" width="132.86" height="10" fill="#2ca02c"/>
-        <rect x="0" y="155" width="76.175" height="10" fill="#d62728"/>
-        <rect x="0" y="165" width="100.745" height="10" fill="#1f77b4"/>
+        <g>
+            <rect x="0" y="170" width="183.415" height="12" fill="#ff6b6b"/>
+            <text x="188.415" y="180" font-family="Arial" font-size="10">3.67s</text>
+            <rect x="0" y="185" width="132.86" height="12" fill="#4ecdc4"/>
+            <text x="137.86" y="195" font-family="Arial" font-size="10">2.66s</text>
+            <rect x="0" y="200" width="76.175" height="12" fill="#45b7d1"/>
+            <text x="81.175" y="210" font-family="Arial" font-size="10">1.52s</text>
+            <rect x="0" y="215" width="100.745" height="12" fill="#96ceb4"/>
+            <text x="105.745" y="225" font-family="Arial" font-size="10">2.01s</text>
+        </g>
 
         <!-- fib -->
-        <text x="0" y="205" text-anchor="end" class="label">fib</text>
-        <rect x="0" y="195" width="52.705" height="10" fill="#ff7f0e"/>
-        <rect x="0" y="205" width="68.115" height="10" fill="#2ca02c"/>
-        <rect x="0" y="215" width="235.41" height="10" fill="#d62728"/>
-        <rect x="0" y="225" width="53.27" height="10" fill="#1f77b4"/>
+        <g>
+            <rect x="0" y="250" width="108.32" height="12" fill="#ff6b6b"/>
+            <text x="113.32" y="260" font-family="Arial" font-size="10">2.17s</text>
+            <rect x="0" y="265" width="68.115" height="12" fill="#4ecdc4"/>
+            <text x="73.115" y="275" font-family="Arial" font-size="10">1.36s</text>
+            <rect x="0" y="280" width="235.41" height="12" fill="#45b7d1"/>
+            <text x="240.41" y="290" font-family="Arial" font-size="10">4.71s</text>
+            <rect x="0" y="295" width="53.27" height="12" fill="#96ceb4"/>
+            <text x="58.27" y="305" font-family="Arial" font-size="10">1.07s</text>
+        </g>
 
         <!-- instantiation -->
-        <text x="0" y="265" text-anchor="end" class="label">instantiation</text>
-        <rect x="0" y="255" width="92.79" height="10" fill="#ff7f0e"/>
-        <rect x="0" y="265" width="120.155" height="10" fill="#2ca02c"/>
-        <rect x="0" y="275" width="212" height="10" fill="#d62728"/>
-        <rect x="0" y="285" width="93.505" height="10" fill="#1f77b4"/>
+        <g>
+            <rect x="0" y="330" width="136.345" height="12" fill="#ff6b6b"/>
+            <text x="141.345" y="340" font-family="Arial" font-size="10">2.73s</text>
+            <rect x="0" y="345" width="120.155" height="12" fill="#4ecdc4"/>
+            <text x="125.155" y="355" font-family="Arial" font-size="10">2.40s</text>
+            <rect x="0" y="360" width="212" height="12" fill="#45b7d1"/>
+            <text x="217" y="370" font-family="Arial" font-size="10">4.24s</text>
+            <rect x="0" y="375" width="93.505" height="12" fill="#96ceb4"/>
+            <text x="98.505" y="385" font-family="Arial" font-size="10">1.87s</text>
+        </g>
 
         <!-- invocation -->
-        <text x="0" y="325" text-anchor="end" class="label">invocation</text>
-        <rect x="0" y="315" width="13.385" height="10" fill="#ff7f0e"/>
-        <rect x="0" y="325" width="28.245" height="10" fill="#2ca02c"/>
-        <rect x="0" y="335" width="49.16" height="10" fill="#d62728"/>
-        <rect x="0" y="345" width="13.53" height="10" fill="#1f77b4"/>
+        <g>
+            <rect x="0" y="410" width="40.96" height="12" fill="#ff6b6b"/>
+            <text x="45.96" y="420" font-family="Arial" font-size="10">0.82s</text>
+            <rect x="0" y="425" width="28.245" height="12" fill="#4ecdc4"/>
+            <text x="33.245" y="435" font-family="Arial" font-size="10">0.56s</text>
+            <rect x="0" y="440" width="49.16" height="12" fill="#45b7d1"/>
+            <text x="54.16" y="450" font-family="Arial" font-size="10">0.98s</text>
+            <rect x="0" y="455" width="13.53" height="12" fill="#96ceb4"/>
+            <text x="18.53" y="465" font-family="Arial" font-size="10">0.27s</text>
+        </g>
 
         <!-- method_call -->
-        <text x="0" y="385" text-anchor="end" class="label">method_call</text>
-        <rect x="0" y="375" width="9.34" height="10" fill="#ff7f0e"/>
-        <rect x="0" y="385" width="13.645" height="10" fill="#2ca02c"/>
-        <rect x="0" y="395" width="55.5" height="10" fill="#d62728"/>
-        <rect x="0" y="405" width="9.415" height="10" fill="#1f77b4"/>
+        <g>
+            <rect x="0" y="490" width="26.905" height="12" fill="#ff6b6b"/>
+            <text x="31.905" y="500" font-family="Arial" font-size="10">0.54s</text>
+            <rect x="0" y="505" width="13.645" height="12" fill="#4ecdc4"/>
+            <text x="18.645" y="515" font-family="Arial" font-size="10">0.27s</text>
+            <rect x="0" y="520" width="55.5" height="12" fill="#45b7d1"/>
+            <text x="60.5" y="530" font-family="Arial" font-size="10">1.11s</text>
+            <rect x="0" y="535" width="9.415" height="12" fill="#96ceb4"/>
+            <text x="14.415" y="545" font-family="Arial" font-size="10">0.19s</text>
+        </g>
+
+        <!-- properties -->
+        <g>
+            <rect x="0" y="570" width="59.985" height="12" fill="#ff6b6b"/>
+            <text x="64.985" y="580" font-family="Arial" font-size="10">1.20s</text>
+            <rect x="0" y="585" width="47.825" height="12" fill="#4ecdc4"/>
+            <text x="52.825" y="595" font-family="Arial" font-size="10">0.96s</text>
+            <rect x="0" y="600" width="78.7" height="12" fill="#45b7d1"/>
+            <text x="83.7" y="610" font-family="Arial" font-size="10">1.57s</text>
+            <rect x="0" y="615" width="20.725" height="12" fill="#96ceb4"/>
+            <text x="25.725" y="625" font-family="Arial" font-size="10">0.41s</text>
+        </g>
 
         <!-- trees -->
-        <text x="0" y="445" text-anchor="end" class="label">trees</text>
-        <rect x="0" y="435" width="137.75" height="10" fill="#ff7f0e"/>
-        <rect x="0" y="445" width="127.695" height="10" fill="#2ca02c"/>
-        <rect x="0" y="455" width="605.005" height="10" fill="#d62728"/>
-        <rect x="0" y="465" width="134.775" height="10" fill="#1f77b4"/>
+        <g>
+            <rect x="0" y="650" width="450.53" height="12" fill="#ff6b6b"/>
+            <text x="455.53" y="660" font-family="Arial" font-size="10">9.01s</text>
+            <rect x="0" y="665" width="127.695" height="12" fill="#4ecdc4"/>
+            <text x="132.695" y="675" font-family="Arial" font-size="10">2.55s</text>
+            <rect x="0" y="680" width="605.005" height="12" fill="#45b7d1"/>
+            <text x="610.005" y="690" font-family="Arial" font-size="10">12.10s</text>
+            <rect x="0" y="695" width="134.775" height="12" fill="#96ceb4"/>
+            <text x="139.775" y="705" font-family="Arial" font-size="10">2.70s</text>
+        </g>
+
+        <!-- zoo -->
+        <g>
+            <rect x="0" y="730" width="46.35" height="12" fill="#ff6b6b"/>
+            <text x="51.35" y="740" font-family="Arial" font-size="10">0.93s</text>
+            <rect x="0" y="745" width="36.535" height="12" fill="#4ecdc4"/>
+            <text x="41.535" y="755" font-family="Arial" font-size="10">0.73s</text>
+            <rect x="0" y="760" width="61.815" height="12" fill="#45b7d1"/>
+            <text x="66.815" y="770" font-family="Arial" font-size="10">1.24s</text>
+            <rect x="0" y="775" width="15.52" height="12" fill="#96ceb4"/>
+            <text x="20.52" y="785" font-family="Arial" font-size="10">0.31s</text>
+        </g>
     </g>
 </svg>
